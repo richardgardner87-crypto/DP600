@@ -1,0 +1,10 @@
+node_modules/
+.env
+.streamlit/secrets.toml
+*.json
+*.csv
+.DS_Store
+storage/
+__pycache__/
+*.pyc
+*.pyo
