@@ -2,7 +2,7 @@ node_modules/
 .env
 .streamlit/secrets.toml
 *.json
-*.csv
+/*.csv
 .DS_Store
 storage/
 __pycache__/
