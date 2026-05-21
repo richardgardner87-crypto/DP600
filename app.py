@@ -357,6 +357,15 @@ if page == "Introduction":
         else:
             _pw_dialog()
 
+    st.markdown('<hr class="lp-divider">', unsafe_allow_html=True)
+    st.caption(
+        "These projects are intended to demonstrate how a business process can be modelled "
+        "and augmented with AI. In practice, a significant proportion of the effort in any "
+        "AI project goes into testing and achieving consistent, reliable outputs. Here, the "
+        "emphasis has been placed on illustrating a coherent and well-structured business "
+        "process — the AI layer is built on top of that foundation, not instead of it."
+    )
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 1 — DASHBOARD
