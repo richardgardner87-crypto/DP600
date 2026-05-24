@@ -48,6 +48,13 @@ def _log_tokens(page: str, model: str, usage: dict):
         "cost":       cost,
     })
 
+
+def _notes(content: str, label: str = "Notes"):
+    """Render a floating Notes popover button."""
+    with st.popover(f"📝 {label}"):
+        st.markdown(content)
+
+
 # Streamlit Cloud stores secrets in st.secrets — push them into env so all
 # modules (advisor, scraper) pick them up via os.getenv() unchanged.
 for _k in ("ANTHROPIC_API_KEY", "APIFY_TOKEN"):
@@ -947,6 +954,27 @@ elif page == "Product Lookup":
         "Select a sample product to classify its ingredients against GCC customs rules, "
         "then add it to your warehouse inventory."
     )
+    _notes("""\
+One of the massive advantages of LLMs is their ability to do string comparisons.
+
+I have spent a lot of my career matching strings — a staff taxi usage application using
+Levenshtein distances, forced UPPER to compare misspelled surnames, regex for standardising
+phone numbers to calculate taxable benefits for staff using the corporate taxi account.
+Sending parcels to the notoriously exacting German delivery networks, ensuring town names
+exist on labels and postcodes are conformant. There are always messy applications that have
+historically needed a lot of TLC to deliver results.
+
+Where LLMs really shine is comparing strings that are not the same — they understand that
+**5-Hydroxytryptophan** and **5-HTP** are the same product, whereas in the past my code
+would be littered with lookup tables making exactly these kinds of comparisons.
+
+Better yet, you do not need a frontier model to do these kinds of comparisons — I am using
+**Haiku** for this part of the demonstration, at far lower costs.
+
+Of course, care must be taken, but this is a relatively enclosed training exercise, and
+training an LLM to make these comparisons is a far better long-term solution than a brittle
+SQL or Python script.
+""")
 
     # ── Sample selector ────────────────────────────────────────────────────────
     _SAMPLE_PATH = Path(__file__).parent / "data" / "sample_products.json"
