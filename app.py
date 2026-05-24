@@ -435,10 +435,12 @@ if page == "Introduction":
         "job boards, identify relevant roles, and assist with applications — without allowing "
         "it to make the most common AI-assisted CV error: fabricating experience or "
         "embellishing qualifications to pass ATS screening.</p>"
-        "<p>The constraint is deliberate. The model is given the actual CV and instructed to "
-        "tailor applications only from what is genuinely there — matching language and "
-        "emphasis to each role's requirements, not inventing credentials to clear filters "
-        "it would otherwise not pass.</p>"
+        "<p>The constraint is deliberate. I wear several hats — ERP Implementation, "
+        "Logistics Integration, Business Intelligence, and Data Architecture — and maintain "
+        "four CVs with different slants to reflect this. The model is given bullet points "
+        "from all four as a constrained source of truth, and constructs a tailored CV that "
+        "fits the specific requirement — drawing only from what is genuinely there, not "
+        "inventing credentials to clear filters it would otherwise not pass.</p>"
         "</div>",
         unsafe_allow_html=True,
     )
