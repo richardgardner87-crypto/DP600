@@ -379,6 +379,11 @@ if page == "Introduction":
         "lower-threshold country, apply a discount to clear stock before the window closes, "
         "or write off. A natural language compliance advisor lets warehouse managers ask "
         "questions directly and get specific, data-grounded answers.</p>"
+        '<div class="pillar-row">'
+        '<div class="pillar-tile pt-purple"><strong>Behaviour</strong>Rules engine encodes GCC regulations per country — shelf life thresholds, banned ingredient lists, Halal and Rx rules — with confidence levels where rules are unverified.</div>'
+        '<div class="pillar-tile pt-teal"><strong>Knowledge</strong>The warehouse inventory is the knowledge base. The compliance advisor queries it with structured tools rather than guessing — quantities, values, and expiry dates grounded in real data.</div>'
+        '<div class="pillar-tile pt-coral"><strong>Action</strong>The compliance data writes directly to the allocations table — switching batch picks by destination so stock is automatically routed to the countries where it remains compliant.</div>'
+        "</div>"
         "</div>",
         unsafe_allow_html=True,
     )
