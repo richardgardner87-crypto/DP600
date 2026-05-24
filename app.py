@@ -971,9 +971,17 @@ would be littered with lookup tables making exactly these kinds of comparisons.
 Better yet, you do not need a frontier model to do these kinds of comparisons — I am using
 **Haiku** for this part of the demonstration, at far lower costs.
 
-Of course, care must be taken, but this is a relatively enclosed training exercise, and
-training an LLM to make these comparisons is a far better long-term solution than a brittle
-SQL or Python script.
+Of course, care must be taken, but this is a relatively closed training set. Training an LLM
+to make these comparisons is a far better long-term solution than a brittle SQL or Python script.
+There are a few options to give us the ability to correct mistakes. First — and fundamentally —
+a human with domain knowledge must identify and correct any responses which are incorrect.
+Then we have the options of:
+
+- Using **RAG** to upload those corrections every time the model is called
+- Using **prompt engineering** to create explicit rules
+- **Training a private model** (e.g. GPT-4o mini) with your own labelled correction data
+
+All of these approaches have trade-offs between cost and effectiveness.
 """)
 
     # ── Sample selector ────────────────────────────────────────────────────────
