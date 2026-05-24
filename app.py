@@ -383,6 +383,11 @@ if page == "Introduction":
     st.markdown('<p class="lp-section-label">Projects</p>', unsafe_allow_html=True)
 
     # ── Project card ──────────────────────────────────────────────────────────
+    import base64 as _b64
+    _ai_img = _b64.b64encode(
+        (Path(__file__).parent / "AI.png").read_bytes()
+    ).decode()
+
     st.markdown(
         '<div class="proj-card">'
         '<p class="proj-card-title">GCC Customs Compliance Engine &mdash; Dietary Supplements</p>'
@@ -397,10 +402,10 @@ if page == "Introduction":
         "lower-threshold country, apply a discount to clear stock before the window closes, "
         "or write off. A natural language compliance advisor lets warehouse managers ask "
         "questions directly and get specific, data-grounded answers.</p>"
+        f'<img src="data:image/png;base64,{_ai_img}" style="width:60%;display:block;margin:1.2rem auto 0.5rem;"/>'
         "</div>",
         unsafe_allow_html=True,
     )
-    st.image("AI.png", use_container_width=True)
 
     if st.button("Open — GCC Compliance Engine →", type="primary", use_container_width=True):
         st.session_state["nav_page"] = "Dashboard"
