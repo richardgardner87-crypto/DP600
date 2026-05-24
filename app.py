@@ -296,9 +296,9 @@ if page == "Introduction":
             text-transform: uppercase;
             margin-bottom: 4px;
         }
-        .pt-purple { background: #EEEDFE; color: #3C3489; }
-        .pt-teal   { background: #E1F5EE; color: #085041; }
-        .pt-coral  { background: #FAECE7; color: #712B13; }
+        .pt-purple { background: #EDE8F8; color: #4A2D8E; }  /* Behaviour — purple */
+        .pt-teal   { background: #FEF0D8; color: #7A4200; }  /* Knowledge  — orange */
+        .pt-coral  { background: #EDF2E0; color: #3A5218; }  /* Action     — sage green */
         /* Placeholder / coming-soon card */
         .proj-card-soon {
             border-radius: 14px;
