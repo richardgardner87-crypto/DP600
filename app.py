@@ -299,6 +299,27 @@ if page == "Introduction":
         .pt-purple { background: #EEEDFE; color: #3C3489; }
         .pt-teal   { background: #E1F5EE; color: #085041; }
         .pt-coral  { background: #FAECE7; color: #712B13; }
+        /* Placeholder / coming-soon card */
+        .proj-card-soon {
+            border-radius: 14px;
+            border: 1px dashed rgba(128,128,128,0.35);
+            border-left: 3px dashed rgba(128,128,128,0.45);
+            padding: 1.75rem 2.25rem 1.5rem;
+            opacity: 0.68;
+        }
+        .proj-card-soon .proj-card-title { color: inherit; }
+        .soon-badge {
+            display: inline-block;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            background: rgba(128,128,128,0.13);
+            border-radius: 4px;
+            padding: 2px 8px;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
         /* Button tuck under card */
         div[data-testid="stButton"] > button[kind="primaryFormSubmit"],
         div[data-testid="stButton"] > button[kind="primary"] {
@@ -388,6 +409,39 @@ if page == "Introduction":
     if st.button("Open — GCC Compliance Engine →", type="primary", use_container_width=True):
         st.session_state["nav_page"] = "Dashboard"
         st.rerun()
+
+    st.markdown(
+        '<div class="proj-card-soon">'
+        '<p class="proj-card-title">MIDP / Aconex Reconciliation'
+        '<span class="soon-badge">In Progress</span></p>'
+        "<p>AI assistance for a heavily manual process reconciling MIDP deliverables with "
+        "controlled documents in Aconex. Construction and engineering projects generate "
+        "thousands of controlled documents — cross-referencing deliverable registers against "
+        "submission records by hand is slow, error-prone, and a poor use of document "
+        "controllers' time.</p>"
+        "<p>This project explores the use case within a SharePoint environment, using "
+        "Microsoft's Graph API to leverage delta changes and optimise RAG — so the model "
+        "reasons over what has <em>changed</em> rather than re-ingesting the entire document "
+        "corpus on every query.</p>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="proj-card-soon">'
+        '<p class="proj-card-title">Job Board Assistant'
+        '<span class="soon-badge">In Progress</span></p>'
+        "<p>Job hunting is time-consuming and repetitive. This project uses Claude to monitor "
+        "job boards, identify relevant roles, and assist with applications — without allowing "
+        "it to make the most common AI-assisted CV error: fabricating experience or "
+        "embellishing qualifications to pass ATS screening.</p>"
+        "<p>The constraint is deliberate. The model is given the actual CV and instructed to "
+        "tailor applications only from what is genuinely there — matching language and "
+        "emphasis to each role's requirements, not inventing credentials to clear filters "
+        "it would otherwise not pass.</p>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
     st.markdown('<hr class="lp-divider">', unsafe_allow_html=True)
     st.caption(
