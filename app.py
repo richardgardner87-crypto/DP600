@@ -145,10 +145,6 @@ with st.sidebar:
         st.rerun()
 
 
-# ── Auth guard — intro is public; all other pages require authentication ───────
-if page != "Introduction" and not st.session_state.get("_auth"):
-    st.session_state["nav_page"] = "Introduction"
-    st.rerun()
 
 # ── Load data ──────────────────────────────────────────────────────────────────
 df = get_report()
@@ -389,27 +385,9 @@ if page == "Introduction":
         unsafe_allow_html=True,
     )
 
-    @st.dialog("Access required")
-    def _pw_dialog():
-        st.caption("Enter the password to open the GCC Compliance Engine.")
-        pwd = st.text_input("Password", type="password",
-                            label_visibility="collapsed",
-                            placeholder="Password")
-        if st.button("Enter →", type="primary", use_container_width=True):
-            expected = st.secrets.get("APP_PASSWORD", "")
-            if pwd and pwd == expected:
-                st.session_state["_auth"] = True
-                st.session_state["nav_page"] = "Dashboard"
-                st.rerun()
-            else:
-                st.error("Incorrect password.")
-
     if st.button("Open — GCC Compliance Engine →", type="primary", use_container_width=True):
-        if st.session_state.get("_auth"):
-            st.session_state["nav_page"] = "Dashboard"
-            st.rerun()
-        else:
-            _pw_dialog()
+        st.session_state["nav_page"] = "Dashboard"
+        st.rerun()
 
     st.markdown('<hr class="lp-divider">', unsafe_allow_html=True)
     st.caption(
