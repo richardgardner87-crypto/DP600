@@ -929,8 +929,8 @@ elif page == "Product Lookup":
     if "classifier_usage" not in st.session_state:
         st.session_state.classifier_usage = {"input_tokens": 0, "output_tokens": 0, "api_calls": 0}
 
-    _CL_IN_CPT  = 3.0  / 1_000_000
-    _CL_OUT_CPT = 15.0 / 1_000_000
+    _CL_IN_CPT  = 0.80 / 1_000_000   # Haiku 4.5
+    _CL_OUT_CPT = 4.0  / 1_000_000
     _STATUS_ICON = {"CLEAR": "✅", "INGREDIENT": "🚫", "RX_ONLY": "💊", "HALAL": "☪️", "BLOCKED": "⛔"}
     _RISK_COLOUR = {"LOW": "green", "MEDIUM": "orange", "HIGH": "red", "BLOCKED": "red"}
 
