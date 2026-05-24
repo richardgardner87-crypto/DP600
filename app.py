@@ -23,6 +23,31 @@ load_dotenv()
 if "nav_page" not in st.session_state:
     st.session_state["nav_page"] = "Introduction"
 
+# ── Centralised token logger ───────────────────────────────────────────────────
+_MODEL_PRICING = {
+    "claude-sonnet-4-6":        {"in": 3.00,  "out": 15.0},
+    "claude-haiku-4-5-20251001": {"in": 0.80,  "out":  4.0},
+}
+
+def _log_tokens(page: str, model: str, usage: dict):
+    if not usage:
+        return
+    if "token_log" not in st.session_state:
+        st.session_state.token_log = []
+    from datetime import datetime as _dt
+    pricing = _MODEL_PRICING.get(model, {"in": 3.0, "out": 15.0})
+    cost = (usage.get("input_tokens", 0) * pricing["in"]
+            + usage.get("output_tokens", 0) * pricing["out"]) / 1_000_000
+    st.session_state.token_log.append({
+        "time":       _dt.now().strftime("%H:%M:%S"),
+        "page":       page,
+        "model":      model,
+        "in_tokens":  usage.get("input_tokens", 0),
+        "out_tokens": usage.get("output_tokens", 0),
+        "api_calls":  usage.get("api_calls", 1),
+        "cost":       cost,
+    })
+
 # Streamlit Cloud stores secrets in st.secrets — push them into env so all
 # modules (advisor, scraper) pick them up via os.getenv() unchanged.
 for _k in ("ANTHROPIC_API_KEY", "APIFY_TOKEN"):
@@ -72,7 +97,7 @@ with st.sidebar:
     st.caption("iHerb Saudi Logistics — Allocation Risk Monitor")
     st.divider()
 
-    _pages = ["Introduction", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup"]
+    _pages = ["Introduction", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage"]
     _idx = _pages.index(st.session_state.get("nav_page", "Introduction"))
     page = st.radio(
         "Navigate",
@@ -655,6 +680,7 @@ elif page == "Compliance Chat":
                 )
                 for k in ("input_tokens", "output_tokens", "api_calls"):
                     st.session_state.chat_usage[k] += usage.get(k, 0)
+                _log_tokens("Compliance Chat", "claude-sonnet-4-6", usage)
         st.session_state.chat_messages = updated
         st.rerun()
 
@@ -701,6 +727,7 @@ elif page == "Compliance Chat":
                 )
                 for k in ("input_tokens", "output_tokens", "api_calls"):
                     st.session_state.chat_usage[k] += usage.get(k, 0)
+                _log_tokens("Compliance Chat", "claude-sonnet-4-6", usage)
 
         st.session_state.chat_messages = updated
 
@@ -950,37 +977,47 @@ elif page == "Product Lookup":
 
             if "error" in result:
                 st.error(result["error"])
+                st.session_state.pop("last_classification", None)
             else:
                 usage = result.pop("_usage", {})
-                risk  = result.get("overall_risk", "")
-
-                st.markdown(
-                    f"**Overall risk:** :{_RISK_COLOUR.get(risk, 'grey')}[{risk}]  ·  "
-                    f"**HS Code:** `{result.get('suggested_hs_code', '—')}`  ·  "
-                    f"**Halal:** {result.get('halal_assessment', '—')}"
-                )
-                st.caption(result.get("halal_note", ""))
-                st.info(result.get("summary", ""))
-
-                countries_data = result.get("countries", {})
-                if countries_data:
-                    rows = [
-                        {
-                            "Country": country,
-                            "Status":  f"{_STATUS_ICON.get(data.get('status',''), '')} {data.get('status','')}",
-                            "Flags":   ", ".join(data.get("flags", [])) or "—",
-                        }
-                        for country, data in countries_data.items()
-                    ]
-                    st.dataframe(pd.DataFrame(rows).set_index("Country"), use_container_width=True)
-
+                st.session_state.last_classification = {"product": sel["name"], "result": result, "usage": usage}
                 if usage:
-                    cost = usage["input_tokens"] * _CL_IN_CPT + usage["output_tokens"] * _CL_OUT_CPT
-                    st.caption(
-                        f"↑ {usage['input_tokens']:,} in · {usage['output_tokens']:,} out · ~${cost:.4f}"
-                    )
                     for k in ("input_tokens", "output_tokens", "api_calls"):
                         st.session_state.classifier_usage[k] += usage.get(k, 0)
+                    _log_tokens("Product Lookup", "claude-haiku-4-5-20251001", usage)
+
+    # Render persisted classification result
+    if "last_classification" in st.session_state:
+        lc     = st.session_state.last_classification
+        result = lc["result"]
+        usage  = lc["usage"]
+        risk   = result.get("overall_risk", "")
+
+        st.markdown(
+            f"**Overall risk:** :{_RISK_COLOUR.get(risk, 'grey')}[{risk}]  ·  "
+            f"**HS Code:** `{result.get('suggested_hs_code', '—')}`  ·  "
+            f"**Halal:** {result.get('halal_assessment', '—')}"
+        )
+        st.caption(result.get("halal_note", ""))
+        st.info(result.get("summary", ""))
+
+        countries_data = result.get("countries", {})
+        if countries_data:
+            rows = [
+                {
+                    "Country": country,
+                    "Status":  f"{_STATUS_ICON.get(data.get('status',''), '')} {data.get('status','')}",
+                    "Flags":   ", ".join(data.get("flags", [])) or "—",
+                }
+                for country, data in countries_data.items()
+            ]
+            st.dataframe(pd.DataFrame(rows).set_index("Country"), use_container_width=True)
+
+        if usage:
+            cost = usage["input_tokens"] * _CL_IN_CPT + usage["output_tokens"] * _CL_OUT_CPT
+            st.caption(
+                f"↑ {usage['input_tokens']:,} in · {usage['output_tokens']:,} out · ~${cost:.4f}"
+            )
 
     tot_cl = st.session_state.classifier_usage
     if tot_cl["api_calls"] > 0:
@@ -1123,3 +1160,68 @@ elif page == "Product Lookup":
         st.cache_data.clear()
         st.success(f"Added **{new_sku}** — {sel['name']} to inventory.")
         st.caption("Navigate to the Dashboard or Allocation Table to see the updated data.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE 6 — TOKEN USAGE
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "Token Usage":
+    components.html(_SCROLL_JS, height=0, scrolling=False)
+    st.header("Token Usage")
+    st.caption("API calls made this session, which page triggered them, and their cost.")
+
+    log = st.session_state.get("token_log", [])
+
+    if not log:
+        st.info("No API calls made yet this session. Use the Compliance Chat or Product Lookup to generate some.")
+    else:
+        df_log = pd.DataFrame(log)
+
+        # ── Session totals ─────────────────────────────────────────────────────
+        total_cost = df_log["cost"].sum()
+        total_in   = df_log["in_tokens"].sum()
+        total_out  = df_log["out_tokens"].sum()
+        total_calls = df_log["api_calls"].sum()
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total cost",        f"${total_cost:.4f}")
+        m2.metric("Input tokens",      f"{total_in:,}")
+        m3.metric("Output tokens",     f"{total_out:,}")
+        m4.metric("API calls",         f"{int(total_calls)}")
+
+        st.divider()
+
+        # ── By page breakdown ──────────────────────────────────────────────────
+        st.subheader("By Page")
+        by_page = (
+            df_log.groupby("page")
+            .agg(
+                calls    =("api_calls",  "sum"),
+                in_tokens=("in_tokens",  "sum"),
+                out_tokens=("out_tokens", "sum"),
+                cost     =("cost",        "sum"),
+            )
+            .reset_index()
+            .sort_values("cost", ascending=False)
+        )
+        by_page["cost"] = by_page["cost"].map("${:.4f}".format)
+        by_page["in_tokens"]  = by_page["in_tokens"].map("{:,}".format)
+        by_page["out_tokens"] = by_page["out_tokens"].map("{:,}".format)
+        by_page.columns = ["Page", "API Calls", "Input Tokens", "Output Tokens", "Cost"]
+        st.dataframe(by_page.set_index("Page"), use_container_width=True)
+
+        st.divider()
+
+        # ── Full call log ──────────────────────────────────────────────────────
+        st.subheader("Call Log")
+        df_display = df_log.copy()
+        df_display["cost"] = df_display["cost"].map("${:.4f}".format)
+        df_display["in_tokens"]  = df_display["in_tokens"].map("{:,}".format)
+        df_display["out_tokens"] = df_display["out_tokens"].map("{:,}".format)
+        df_display.columns = ["Time", "Page", "Model", "Input", "Output", "API Calls", "Cost"]
+        st.dataframe(df_display.set_index("Time"), use_container_width=True)
+
+        st.divider()
+        if st.button("Clear usage log", type="secondary"):
+            st.session_state.token_log = []
+            st.rerun()
