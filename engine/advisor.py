@@ -165,15 +165,16 @@ def _run_tool(name: str, inputs: dict, df: pd.DataFrame) -> str:
     return json.dumps({"error": f"Unknown tool: {name}"})
 
 
-def chat(messages: list, df: pd.DataFrame) -> tuple[str, list]:
-    """One turn of the agentic chat loop. Returns (reply_text, updated_messages)."""
+def chat(messages: list, df: pd.DataFrame) -> tuple[str, list, dict]:
+    """One turn of the agentic chat loop. Returns (reply_text, updated_messages, usage)."""
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        return "ANTHROPIC_API_KEY not set in .env", messages
+        return "ANTHROPIC_API_KEY not set in .env", messages, {}
 
     client = anthropic.Anthropic(api_key=api_key)
 
     working_messages = list(messages)
+    usage = {"input_tokens": 0, "output_tokens": 0, "api_calls": 0}
 
     for _ in range(8):  # max tool-call rounds
         response = client.messages.create(
@@ -184,10 +185,14 @@ def chat(messages: list, df: pd.DataFrame) -> tuple[str, list]:
             messages=working_messages,
         )
 
+        usage["input_tokens"]  += response.usage.input_tokens
+        usage["output_tokens"] += response.usage.output_tokens
+        usage["api_calls"]     += 1
+
         if response.stop_reason == "end_turn":
             text = next((b.text for b in response.content if hasattr(b, "text")), "")
             working_messages.append({"role": "assistant", "content": response.content})
-            return text, working_messages
+            return text, working_messages, usage
 
         if response.stop_reason == "tool_use":
             working_messages.append({"role": "assistant", "content": response.content})
@@ -201,4 +206,4 @@ def chat(messages: list, df: pd.DataFrame) -> tuple[str, list]:
             ]
             working_messages.append({"role": "user", "content": results})
 
-    return "Reached tool call limit — please rephrase your question.", messages
+    return "Reached tool call limit — please rephrase your question.", messages, usage

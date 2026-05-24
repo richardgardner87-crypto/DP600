@@ -607,6 +607,12 @@ elif page == "Compliance Chat":
 
     if "chat_messages" not in st.session_state:
         st.session_state.chat_messages = []
+    if "chat_usage" not in st.session_state:
+        st.session_state.chat_usage = {"input_tokens": 0, "output_tokens": 0, "api_calls": 0}
+
+    # Approximate Sonnet pricing
+    _IN_CPT  = 3.0  / 1_000_000
+    _OUT_CPT = 15.0 / 1_000_000
 
     # Render conversation history
     for msg in st.session_state.chat_messages:
@@ -636,11 +642,19 @@ elif page == "Compliance Chat":
         with st.chat_message("assistant"):
             with st.spinner("Checking inventory…"):
                 try:
-                    reply, updated = chat(list(st.session_state.chat_messages), df)
+                    reply, updated, usage = chat(list(st.session_state.chat_messages), df)
                 except Exception as e:
                     st.error(f"Chat error: {e}")
                     st.stop()
             st.markdown(reply.replace("$", r"\$"))
+            if usage:
+                st.caption(
+                    f"↑ {usage['input_tokens']:,} in · {usage['output_tokens']:,} out "
+                    f"· {usage['api_calls']} API call{'s' if usage['api_calls'] != 1 else ''} "
+                    f"· ~${usage['input_tokens']*_IN_CPT + usage['output_tokens']*_OUT_CPT:.4f}"
+                )
+                for k in ("input_tokens", "output_tokens", "api_calls"):
+                    st.session_state.chat_usage[k] += usage.get(k, 0)
         st.session_state.chat_messages = updated
         st.rerun()
 
@@ -671,7 +685,7 @@ elif page == "Compliance Chat":
         with st.chat_message("assistant"):
             with st.spinner("Checking inventory…"):
                 try:
-                    reply, updated = chat(
+                    reply, updated, usage = chat(
                         [m for m in st.session_state.chat_messages],
                         df,
                     )
@@ -679,12 +693,27 @@ elif page == "Compliance Chat":
                     st.error(f"Chat error: {e}")
                     st.stop()
             st.markdown(reply.replace("$", r"\$"))
+            if usage:
+                st.caption(
+                    f"↑ {usage['input_tokens']:,} in · {usage['output_tokens']:,} out "
+                    f"· {usage['api_calls']} API call{'s' if usage['api_calls'] != 1 else ''} "
+                    f"· ~${usage['input_tokens']*_IN_CPT + usage['output_tokens']*_OUT_CPT:.4f}"
+                )
+                for k in ("input_tokens", "output_tokens", "api_calls"):
+                    st.session_state.chat_usage[k] += usage.get(k, 0)
 
         st.session_state.chat_messages = updated
 
     if st.session_state.chat_messages:
+        tot = st.session_state.chat_usage
+        tot_cost = tot["input_tokens"] * _IN_CPT + tot["output_tokens"] * _OUT_CPT
+        st.caption(
+            f"Session total — {tot['input_tokens']:,} in · {tot['output_tokens']:,} out "
+            f"· {tot['api_calls']} API calls · ~${tot_cost:.4f}"
+        )
         if st.button("Clear conversation", type="secondary"):
             st.session_state.chat_messages = []
+            st.session_state.chat_usage = {"input_tokens": 0, "output_tokens": 0, "api_calls": 0}
             st.rerun()
 
 
@@ -883,103 +912,126 @@ elif page == "Risk Actions":
 # PAGE 5 — PRODUCT LOOKUP
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "Product Lookup":
-    from engine.scraper import parse_pasted_block, iherb_search_url
+    from engine.classifier import analyse_ingredients
+    import json as _json
     components.html(_SCROLL_JS, height=0, scrolling=False)
     st.header("Product Lookup")
-    st.markdown(
-        "This page was designed to take an iHerb product name, parse the ingredients list "
-        "and calculate whether the product is legal in GCC (either banned or requires a "
-        "doctor's prescription), and whether it needs a Halal Certificate.\n\n"
-        "Due to iHerb's excellent Cloudflare protection from bots I've settled for a "
-        "cut-and-paste solution — if you paste a name from the iHerb website and click "
-        "**Find on iHerb**, then scroll to the ingredients list and paste it in, it will "
-        "work as intended.\n\n"
-        "I could probably break this protection, but it wouldn't be a lasting solution.\n\n"
-        "Regardless, this information would be available to a partner of iHerb anyway. "
-        "The intention is merely to add a new product, put the ingredients in a table, "
-        "and compare that to the GCC regulations automatically to enable onboarding of "
-        "new products."
+    st.caption(
+        "Select a sample product to classify its ingredients against GCC customs rules, "
+        "then add it to your warehouse inventory."
     )
-    st.divider()
 
-    # ── Step 1: product name + iHerb link ─────────────────────────────────────
-    col_name, col_link = st.columns([4, 1])
-    with col_name:
-        p_name = st.text_input(
-            "Product name",
-            placeholder="e.g. California Gold Nutrition Rexdrive Amino",
+    # ── Sample selector ────────────────────────────────────────────────────────
+    _SAMPLE_PATH = Path(__file__).parent / "data" / "sample_products.json"
+    _samples     = _json.loads(_SAMPLE_PATH.read_text(encoding="utf-8"))
+    _sample_names = [p["name"] for p in _samples]
+
+    if "classifier_usage" not in st.session_state:
+        st.session_state.classifier_usage = {"input_tokens": 0, "output_tokens": 0, "api_calls": 0}
+
+    _CL_IN_CPT  = 3.0  / 1_000_000
+    _CL_OUT_CPT = 15.0 / 1_000_000
+    _STATUS_ICON = {"CLEAR": "✅", "INGREDIENT": "🚫", "RX_ONLY": "💊", "HALAL": "☪️", "BLOCKED": "⛔"}
+    _RISK_COLOUR = {"LOW": "green", "MEDIUM": "orange", "HIGH": "red", "BLOCKED": "red"}
+
+    sel_name = st.selectbox("Product", _sample_names)
+    sel      = next(p for p in _samples if p["name"] == sel_name)
+
+    with st.expander("Ingredients", expanded=False):
+        st.write(sel["ingredients"])
+
+    # ── AI classifier ──────────────────────────────────────────────────────────
+    if st.button("Classify with AI", type="primary", key="run_classifier"):
+        if not os.getenv("ANTHROPIC_API_KEY"):
+            st.error("ANTHROPIC_API_KEY not set.")
+        else:
+            with st.spinner("Classifying…"):
+                result = analyse_ingredients(sel["ingredients"], sel["name"])
+
+            if "error" in result:
+                st.error(result["error"])
+            else:
+                usage = result.pop("_usage", {})
+                risk  = result.get("overall_risk", "")
+
+                st.markdown(
+                    f"**Overall risk:** :{_RISK_COLOUR.get(risk, 'grey')}[{risk}]  ·  "
+                    f"**HS Code:** `{result.get('suggested_hs_code', '—')}`  ·  "
+                    f"**Halal:** {result.get('halal_assessment', '—')}"
+                )
+                st.caption(result.get("halal_note", ""))
+                st.info(result.get("summary", ""))
+
+                countries_data = result.get("countries", {})
+                if countries_data:
+                    rows = [
+                        {
+                            "Country": country,
+                            "Status":  f"{_STATUS_ICON.get(data.get('status',''), '')} {data.get('status','')}",
+                            "Flags":   ", ".join(data.get("flags", [])) or "—",
+                        }
+                        for country, data in countries_data.items()
+                    ]
+                    st.dataframe(pd.DataFrame(rows).set_index("Country"), use_container_width=True)
+
+                if usage:
+                    cost = usage["input_tokens"] * _CL_IN_CPT + usage["output_tokens"] * _CL_OUT_CPT
+                    st.caption(
+                        f"↑ {usage['input_tokens']:,} in · {usage['output_tokens']:,} out · ~${cost:.4f}"
+                    )
+                    for k in ("input_tokens", "output_tokens", "api_calls"):
+                        st.session_state.classifier_usage[k] += usage.get(k, 0)
+
+    tot_cl = st.session_state.classifier_usage
+    if tot_cl["api_calls"] > 0:
+        tot_cost = tot_cl["input_tokens"] * _CL_IN_CPT + tot_cl["output_tokens"] * _CL_OUT_CPT
+        st.caption(
+            f"Session classifier total — {tot_cl['input_tokens']:,} in · "
+            f"{tot_cl['output_tokens']:,} out · {tot_cl['api_calls']} call(s) · ~${tot_cost:.4f}"
         )
-    with col_link:
-        st.markdown("<div style='padding-top:28px'>", unsafe_allow_html=True)
-        if p_name.strip():
-            st.link_button("Find on iHerb ↗", iherb_search_url(p_name.strip()),
-                           use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # ── Step 2: paste ingredients block ───────────────────────────────────────
-    st.markdown(
-        "Open the product page, scroll to the **Other Ingredients** section, "
-        "and paste the text here:",
-    )
-    pasted = st.text_area(
-        "Paste ingredients block",
-        height=180,
-        placeholder=(
-            "Main Ingredients\n"
-            "Vitamin C (as Ascorbic Acid), Zinc (as Zinc Gluconate)\n\n"
-            "Other Ingredients\n"
-            "Microcrystalline Cellulose, Magnesium Stearate\n\n"
-            "Contains: Soy"
-        ),
-        label_visibility="collapsed",
-    )
-
-    parsed = parse_pasted_block(pasted) if pasted.strip() else {}
-    p_ingr = parsed.get("ingredients", "")
-
-    if pasted.strip() and p_ingr:
-        st.success("Ingredients parsed — compliance preview updated below.")
-        if parsed.get("contains"):
-            st.caption(f"Allergen statement: {parsed['contains']}")
-    elif pasted.strip():
-        st.warning("Could not identify an ingredients section. Paste the full block including the 'Main Ingredients' / 'Other Ingredients' headings.")
 
     st.divider()
 
     # ── Warehouse details ──────────────────────────────────────────────────────
     st.subheader("Warehouse Details")
 
-    default_brand = p_name.split(",")[0].strip() if "," in p_name else (p_name.split()[0] if p_name.strip() else "")
+    _categories = ["Vitamins", "Omega", "Protein", "Herbal", "Minerals",
+                   "Probiotics", "Collagen", "Beauty", "Sports", "Other"]
+    _hs_options = {
+        "2106.90 — General supplement": "2106.90",
+        "2936.xx — Vitamins / minerals": "2936.90",
+        "3004.xx — Medicament (Rx)":     "3004.90",
+        "1302.19 — Herbal extract":      "1302.19",
+        "1504.20 — Fish / marine oil":   "1504.20",
+        "3504.00 — Collagen / protein":  "3504.00",
+    }
+    _hs_default_label = next(
+        (lbl for lbl, code in _hs_options.items() if code == sel.get("hs_code")),
+        list(_hs_options.keys())[0],
+    )
+    _cat_default = sel["category"] if sel["category"] in _categories else "Other"
 
+    today = date.today()
     col_a, col_b, col_c = st.columns(3)
     with col_a:
-        brand    = st.text_input("Brand", value=default_brand)
-        category = st.selectbox("Category",
-            ["Vitamins", "Omega", "Protein", "Herbal", "Minerals",
-             "Probiotics", "Collagen", "Beauty", "Sports", "Other"])
-        halal    = st.selectbox("Halal Certified", ["no", "yes"])
-
+        brand    = st.text_input("Brand", value=sel["brand"])
+        category = st.selectbox("Category", _categories,
+                                index=_categories.index(_cat_default))
+        halal    = st.selectbox("Halal Certified", ["no", "yes"],
+                                index=["no","yes"].index(sel.get("halal_certified","no")))
     with col_b:
-        hs_options = {
-            "2106.90 — General supplement": "2106.90",
-            "2936.xx — Vitamins / minerals":  "2936.90",
-            "3004.xx — Medicament (Rx)":       "3004.90",
-            "1302.19 — Herbal extract":        "1302.19",
-            "1504.20 — Fish / marine oil":     "1504.20",
-            "3504.00 — Collagen / protein":    "3504.00",
-        }
-        hs_label   = st.selectbox("HS Code", list(hs_options.keys()))
-        hs_code    = hs_options[hs_label]
-        qty        = st.number_input("Qty on Hand", min_value=1, value=100, step=10)
-        unit_cost  = st.number_input("Unit Cost (USD)", min_value=0.01, value=15.00, step=0.50, format="%.2f")
-
+        hs_label  = st.selectbox("HS Code", list(_hs_options.keys()),
+                                  index=list(_hs_options.keys()).index(_hs_default_label))
+        hs_code   = _hs_options[hs_label]
+        qty       = st.number_input("Qty on Hand", min_value=1, value=100, step=10)
+        unit_cost = st.number_input("Unit Cost (USD)", min_value=0.01, value=15.00,
+                                     step=0.50, format="%.2f")
     with col_c:
-        today = date.today()
-        expiry_date   = st.date_input("Expiry Date",
-                                       value=today.replace(year=today.year + 2))
-        shelf_months  = st.number_input("Total Shelf Life (months)", min_value=1, value=24)
-        shelf_days    = int(shelf_months * 30.44)
-        origin        = st.text_input("Country of Origin", value="USA")
+        expiry_date  = st.date_input("Expiry Date", value=today.replace(year=today.year + 2))
+        shelf_months = st.number_input("Total Shelf Life (months)", min_value=1,
+                                        value=sel.get("shelf_life_months", 24))
+        shelf_days   = int(shelf_months * 30.44)
+        origin       = st.text_input("Country of Origin", value="USA")
 
     manufacture_date = expiry_date - timedelta(days=shelf_days)
 
@@ -987,57 +1039,50 @@ elif page == "Product Lookup":
     st.divider()
     st.subheader("Compliance Preview")
 
-    if p_ingr:
-        compliance = check_compliance(
-            expiry_date=expiry_date,
-            manufacture_date=manufacture_date,
-            total_shelf_life_days=shelf_days,
-            ingredients=p_ingr,
-            halal_certified=halal,
-            hs_code=hs_code,
-        )
+    p_ingr = sel["ingredients"]
+    compliance = check_compliance(
+        expiry_date=expiry_date,
+        manufacture_date=manufacture_date,
+        total_shelf_life_days=shelf_days,
+        ingredients=p_ingr,
+        halal_certified=halal,
+        hs_code=hs_code,
+    )
 
-        prev_cols = st.columns(6)
-        for i, country in enumerate(COUNTRIES):
-            r = compliance[country]
-            bg    = STATUS_COLOR[r.status]
-            fg    = "white" if r.status in ("INGREDIENT", "RX_ONLY") else "#111"
-            icon  = CONFIDENCE_ICON[r.confidence]
-            label = STATUS_LABEL[r.status]
-            tip   = (
-                f"{r.days_remaining}d remaining · "
-                f"{r.remaining_pct*100:.0f}% of shelf life · "
-                f"threshold {r.threshold_pct*100:.0f}%"
+    prev_cols = st.columns(6)
+    for i, country in enumerate(COUNTRIES):
+        r     = compliance[country]
+        bg    = STATUS_COLOR[r.status]
+        fg    = "white" if r.status in ("INGREDIENT", "RX_ONLY") else "#111"
+        icon  = CONFIDENCE_ICON[r.confidence]
+        lbl   = STATUS_LABEL[r.status]
+        tip   = (
+            f"{r.days_remaining}d remaining · "
+            f"{r.remaining_pct*100:.0f}% of shelf life · "
+            f"threshold {r.threshold_pct*100:.0f}%"
+        )
+        with prev_cols[i]:
+            st.markdown(
+                f"""<div title="{tip}" style="text-align:center; background:{bg};
+                color:{fg}; border-radius:6px; padding:10px 4px;
+                font-size:0.82em; font-weight:bold; line-height:1.5;">
+                {country} {icon}<br>{lbl}</div>""",
+                unsafe_allow_html=True,
             )
-            with prev_cols[i]:
-                st.markdown(
-                    f"""<div title="{tip}" style="text-align:center; background:{bg};
-                    color:{fg}; border-radius:6px; padding:10px 4px;
-                    font-size:0.82em; font-weight:bold; line-height:1.5;">
-                    {country} {icon}<br>{label}</div>""",
-                    unsafe_allow_html=True,
-                )
 
-        days_left = (expiry_date - today).days
-        st.caption(
-            f"Days remaining: **{days_left}** · "
-            f"Shelf life used: **{max(0, shelf_days - days_left)}d** of **{shelf_days}d** · "
-            f"Manufacture date: **{manufacture_date}**"
-        )
+    days_left = (expiry_date - today).days
+    st.caption(
+        f"Days remaining: **{days_left}** · "
+        f"Shelf life used: **{max(0, shelf_days - days_left)}d** of **{shelf_days}d** · "
+        f"Manufacture date: **{manufacture_date}**"
+    )
 
-        # Flag any blocked ingredients immediately
-        blocked_ing = [r for c in COUNTRIES
-                       for r in compliance[c].flagged_ingredients]
-        if blocked_ing:
-            unique_blocked = sorted(set(blocked_ing))
-            st.error(f"Banned ingredients detected: {', '.join(unique_blocked)}")
-
-        any_rx = any(compliance[c].is_rx for c in COUNTRIES)
-        if any_rx:
-            st.warning("Contains a substance classified as Rx-only in GCC (e.g. melatonin). "
-                       "Cannot be imported as a supplement.")
-    else:
-        st.info("Enter ingredients above to see the compliance preview.")
+    blocked_ing = sorted({ing for c in COUNTRIES for ing in compliance[c].flagged_ingredients})
+    if blocked_ing:
+        st.error(f"Banned ingredients detected: {', '.join(blocked_ing)}")
+    if any(compliance[c].is_rx for c in COUNTRIES):
+        st.warning("Contains a substance classified as Rx-only in GCC (e.g. melatonin). "
+                   "Cannot be imported as a supplement.")
 
     # ── Add to inventory ───────────────────────────────────────────────────────
     st.divider()
@@ -1047,44 +1092,34 @@ elif page == "Product Lookup":
     with col_add:
         add_clicked = st.button("Add to Inventory", type="primary", use_container_width=True)
     with col_note:
-        st.caption(
-            "Writes a new row to the inventory CSV. "
-            "The Dashboard and Allocation Table will update automatically."
-        )
+        st.caption("Writes a new row to the inventory CSV. "
+                   "The Dashboard and Allocation Table will update automatically.")
 
     if add_clicked:
-        if not p_ingr:
-            st.error("Cannot add: no ingredients available. Enter them manually above.")
-        else:
-            existing_inv = pd.read_csv(str(DATA_PATH))
-            nums = existing_inv["sku_id"].str.extract(r"(\d+)")[0].dropna().astype(int)
-            next_num = int(nums.max()) + 1 if not nums.empty else 1
-            new_sku   = f"SKU-{next_num:05d}"
-            new_batch = f"BATCH-{today.strftime('%Y%m')}-{next_num:03d}"
+        existing_inv = pd.read_csv(str(DATA_PATH))
+        nums     = existing_inv["sku_id"].str.extract(r"(\d+)")[0].dropna().astype(int)
+        next_num = int(nums.max()) + 1 if not nums.empty else 1
+        new_sku  = f"SKU-{next_num:05d}"
 
-            new_row = {
-                "sku_id":              new_sku,
-                "product_name":        p_name,
-                "brand":               brand,
-                "category":            category,
-                "hs_code":             hs_code,
-                "ingredients":         p_ingr,
-                "batch_id":            new_batch,
-                "manufacture_date":    str(manufacture_date),
-                "expiry_date":         str(expiry_date),
-                "total_shelf_life_days": shelf_days,
-                "qty_on_hand":         qty,
-                "unit_cost_usd":       unit_cost,
-                "halal_certified":     halal,
-                "country_of_origin":   origin,
-            }
+        new_row = {
+            "sku_id":                new_sku,
+            "product_name":          sel["name"],
+            "brand":                 brand,
+            "category":              category,
+            "hs_code":               hs_code,
+            "ingredients":           p_ingr,
+            "batch_id":              f"BATCH-{today.strftime('%Y%m')}-{next_num:03d}",
+            "manufacture_date":      str(manufacture_date),
+            "expiry_date":           str(expiry_date),
+            "total_shelf_life_days": shelf_days,
+            "qty_on_hand":           qty,
+            "unit_cost_usd":         unit_cost,
+            "halal_certified":       halal,
+            "country_of_origin":     origin,
+        }
 
-            updated_inv = pd.concat(
-                [existing_inv, pd.DataFrame([new_row])], ignore_index=True
-            )
-            updated_inv.to_csv(str(DATA_PATH), index=False)
-            st.cache_data.clear()
-
-            st.success(f"Added **{new_sku}** — {p_name} to inventory.")
-            st.caption("Navigate to the Dashboard or Allocation Table to see the updated data.")
-            st.session_state.pop("lookup_result", None)
+        updated_inv = pd.concat([existing_inv, pd.DataFrame([new_row])], ignore_index=True)
+        updated_inv.to_csv(str(DATA_PATH), index=False)
+        st.cache_data.clear()
+        st.success(f"Added **{new_sku}** — {sel['name']} to inventory.")
+        st.caption("Navigate to the Dashboard or Allocation Table to see the updated data.")

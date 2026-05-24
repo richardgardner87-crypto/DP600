@@ -50,6 +50,7 @@ def analyse_ingredients(ingredient_text: str, product_name: str = "") -> dict:
 
     user_content = f"Product: {product_name}\nIngredients: {ingredient_text}" if product_name else f"Ingredients: {ingredient_text}"
 
+    raw = ""
     try:
         response = client.messages.create(
             model="claude-sonnet-4-6",
@@ -58,7 +59,17 @@ def analyse_ingredients(ingredient_text: str, product_name: str = "") -> dict:
             messages=[{"role": "user", "content": user_content}],
         )
         raw = response.content[0].text.strip()
-        return json.loads(raw)
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1]
+            raw = raw.rsplit("```", 1)[0].strip()
+        result = json.loads(raw)
+        result["_usage"] = {
+            "input_tokens":  response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+            "api_calls": 1,
+        }
+        return result
     except json.JSONDecodeError as e:
         return {"error": f"JSON parse error: {e}", "raw": raw}
     except anthropic.APIError as e:

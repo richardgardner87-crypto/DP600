@@ -1,0 +1,74 @@
+[
+  {
+    "name": "NOW Foods Vitamin C-1000 with Rose Hips",
+    "brand": "NOW Foods",
+    "category": "Vitamins",
+    "hs_code": "2936.90",
+    "shelf_life_months": 36,
+    "halal_certified": "no",
+    "ingredients": "Vitamin C (as Ascorbic Acid) 1000mg, Rose Hips (Rosa canina)(fruit) 25mg. Other Ingredients: Dicalcium Phosphate, Stearic Acid (vegetable source), Cellulose, Silicon Dioxide, Magnesium Stearate (vegetable source)."
+  },
+  {
+    "name": "Natrol Melatonin Advanced Sleep 10mg",
+    "brand": "Natrol",
+    "category": "Vitamins",
+    "hs_code": "3004.90",
+    "shelf_life_months": 24,
+    "halal_certified": "no",
+    "ingredients": "Melatonin 10mg, Vitamin B6 (as Pyridoxine HCl) 10mg. Other Ingredients: Dicalcium Phosphate, Microcrystalline Cellulose, Stearic Acid (vegetable source), Silica, Magnesium Stearate (vegetable source)."
+  },
+  {
+    "name": "Nordic Naturals Omega-3 Fish Oil 1000mg",
+    "brand": "Nordic Naturals",
+    "category": "Omega",
+    "hs_code": "1504.20",
+    "shelf_life_months": 24,
+    "halal_certified": "no",
+    "ingredients": "Fish Oil Concentrate (from anchovy and sardine) providing: EPA (Eicosapentaenoic Acid) 180mg, DHA (Docosahexaenoic Acid) 120mg. Other Ingredients: Gelatin (bovine), Glycerin, Water, d-Alpha Tocopherol, Rosemary Extract."
+  },
+  {
+    "name": "Optimum Nutrition Gold Standard 100% Whey Protein",
+    "brand": "Optimum Nutrition",
+    "category": "Protein",
+    "hs_code": "3504.00",
+    "shelf_life_months": 24,
+    "halal_certified": "no",
+    "ingredients": "Whey Protein Isolate, Whey Protein Concentrate, Whey Peptides. Other Ingredients: Lecithin (Soy), Acesulfame Potassium, Sucralose, Natural and Artificial Flavors. Contains: Milk, Soy."
+  },
+  {
+    "name": "Doctor's Best 5-HTP 100mg from Griffonia",
+    "brand": "Doctor's Best",
+    "category": "Herbal",
+    "hs_code": "2106.90",
+    "shelf_life_months": 24,
+    "halal_certified": "no",
+    "ingredients": "5-Hydroxytryptophan (5-HTP) 100mg (from Griffonia simplicifolia seed extract 200mg). Other Ingredients: Modified Cellulose (vegetable capsule), Microcrystalline Cellulose, Magnesium Stearate (vegetable source)."
+  },
+  {
+    "name": "Jarrow Formulas DHEA 25mg",
+    "brand": "Jarrow Formulas",
+    "category": "Herbal",
+    "hs_code": "2106.90",
+    "shelf_life_months": 24,
+    "halal_certified": "no",
+    "ingredients": "Dehydroepiandrosterone (DHEA) 25mg. Other Ingredients: Microcrystalline Cellulose, Magnesium Stearate (vegetable source), Silicon Dioxide. Contains: No common allergens."
+  },
+  {
+    "name": "Vital Proteins Collagen Peptides Powder",
+    "brand": "Vital Proteins",
+    "category": "Collagen",
+    "hs_code": "3504.00",
+    "shelf_life_months": 36,
+    "halal_certified": "no",
+    "ingredients": "Bovine Hide Collagen Peptides. Other Ingredients: None. Contains: No common allergens. Collagen peptides sourced from grass-fed, pasture-raised bovine hides."
+  },
+  {
+    "name": "Nutrex Research Lipo-6 Black Intense",
+    "brand": "Nutrex Research",
+    "category": "Sports",
+    "hs_code": "2106.90",
+    "shelf_life_months": 24,
+    "halal_certified": "no",
+    "ingredients": "Thermo-RX & Detox Amplifying Blend 695mg: Caffeine Anhydrous, Theobromine, Synephrine HCl (from Citrus aurantium 30%), Yohimbine HCl, Rauwolscine (Alpha-Yohimbine). Other Ingredients: Gelatin (capsule), Microcrystalline Cellulose, Magnesium Stearate, FD&C Red #40, FD&C Blue #1."
+  }
+]
