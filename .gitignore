@@ -2,7 +2,7 @@ node_modules/
 .env
 .streamlit/secrets.toml
 *.json
-!data/*.json
+!data/sample_products.json
 /*.csv
 .DS_Store
 storage/

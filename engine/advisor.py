@@ -51,7 +51,7 @@ TOOLS = [
     },
 ]
 
-SYSTEM = """You are a GCC customs compliance advisor for iHerb's Saudi Arabia logistics centre.
+SYSTEM = """You are a GCC customs compliance advisor for a dietary supplements distributor's Saudi Arabia logistics centre.
 You have real-time access to the warehouse inventory via tools — always query before making specific claims.
 
 Your role is to help warehouse managers understand:

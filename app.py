@@ -28,17 +28,38 @@ _MODEL_PRICING = {
     "claude-sonnet-4-6":        {"in": 3.00,  "out": 15.0},
     "claude-haiku-4-5-20251001": {"in": 0.80,  "out":  4.0},
 }
+_TOKEN_LOG_PATH = Path(__file__).parent / "data" / "token_log.json"
+
+def _load_token_log() -> list:
+    if _TOKEN_LOG_PATH.exists():
+        try:
+            import json as _j
+            return _j.loads(_TOKEN_LOG_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+    return []
+
+def _save_token_log(log: list):
+    import json as _j
+    _TOKEN_LOG_PATH.write_text(_j.dumps(log, indent=2), encoding="utf-8")
+
+# Assign a stable session ID and load the persistent log once per session
+if "session_id" not in st.session_state:
+    import uuid as _uuid
+    st.session_state.session_id = _uuid.uuid4().hex[:8]
+if "token_log" not in st.session_state:
+    st.session_state.token_log = _load_token_log()
 
 def _log_tokens(page: str, model: str, usage: dict):
     if not usage:
         return
-    if "token_log" not in st.session_state:
-        st.session_state.token_log = []
     from datetime import datetime as _dt
     pricing = _MODEL_PRICING.get(model, {"in": 3.0, "out": 15.0})
     cost = (usage.get("input_tokens", 0) * pricing["in"]
             + usage.get("output_tokens", 0) * pricing["out"]) / 1_000_000
-    st.session_state.token_log.append({
+    entry = {
+        "session_id": st.session_state.session_id,
+        "date":       _dt.now().strftime("%Y-%m-%d"),
         "time":       _dt.now().strftime("%H:%M:%S"),
         "page":       page,
         "model":      model,
@@ -46,7 +67,9 @@ def _log_tokens(page: str, model: str, usage: dict):
         "out_tokens": usage.get("output_tokens", 0),
         "api_calls":  usage.get("api_calls", 1),
         "cost":       cost,
-    })
+    }
+    st.session_state.token_log.append(entry)
+    _save_token_log(st.session_state.token_log)
 
 
 def _notes(content: str, label: str = "Notes"):
@@ -63,7 +86,7 @@ for _k in ("ANTHROPIC_API_KEY", "APIFY_TOKEN"):
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="GCC Compliance Engine — iHerb",
+    page_title="GCC Dietary Supplements Compliance Engine",
     page_icon="🏭",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -99,9 +122,8 @@ def get_report() -> pd.DataFrame:
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.image("https://www.iherb.com/favicon.ico", width=32)
     st.title("GCC Compliance Engine")
-    st.caption("iHerb Saudi Logistics — Allocation Risk Monitor")
+    st.caption("Dietary Supplements — Allocation Risk Monitor")
     st.divider()
 
     _pages = ["Introduction", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage"]
@@ -346,8 +368,8 @@ if page == "Introduction":
     # ── Project card ──────────────────────────────────────────────────────────
     st.markdown(
         '<div class="proj-card">'
-        '<p class="proj-card-title">GCC Customs Compliance Engine &mdash; iHerb Saudi Logistics</p>'
-        "<p>iHerb operates a distribution centre in Saudi Arabia serving the wider GCC market. "
+        '<p class="proj-card-title">GCC Customs Compliance Engine &mdash; Dietary Supplements</p>'
+        "<p>A dietary supplements distributor operates a distribution centre in Saudi Arabia serving the wider GCC market. "
         "Every product in the warehouse must meet the import regulations of each destination "
         "country before it ships — shelf life thresholds, ingredient restrictions, Halal "
         "certification requirements, and Rx classification rules that vary across six "
@@ -1205,60 +1227,82 @@ All of these approaches have trade-offs between cost and effectiveness.
 elif page == "Token Usage":
     components.html(_SCROLL_JS, height=0, scrolling=False)
     st.header("Token Usage")
-    st.caption("API calls made this session, which page triggered them, and their cost.")
+    st.caption("Persistent log of every API call — this session and since inception.")
 
     log = st.session_state.get("token_log", [])
+    sid = st.session_state.session_id
 
-    if not log:
-        st.info("No API calls made yet this session. Use the Compliance Chat or Product Lookup to generate some.")
-    else:
-        df_log = pd.DataFrame(log)
-
-        # ── Session totals ─────────────────────────────────────────────────────
-        total_cost = df_log["cost"].sum()
-        total_in   = df_log["in_tokens"].sum()
-        total_out  = df_log["out_tokens"].sum()
-        total_calls = df_log["api_calls"].sum()
-
+    def _usage_metrics(df, label):
+        st.subheader(label)
+        if df.empty:
+            st.info("No calls recorded.")
+            return
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Total cost",        f"${total_cost:.4f}")
-        m2.metric("Input tokens",      f"{total_in:,}")
-        m3.metric("Output tokens",     f"{total_out:,}")
-        m4.metric("API calls",         f"{int(total_calls)}")
+        m1.metric("Cost",         f"${df['cost'].sum():.4f}")
+        m2.metric("Input tokens", f"{int(df['in_tokens'].sum()):,}")
+        m3.metric("Output tokens",f"{int(df['out_tokens'].sum()):,}")
+        m4.metric("API calls",    f"{int(df['api_calls'].sum()):,}")
 
-        st.divider()
-
-        # ── By page breakdown ──────────────────────────────────────────────────
-        st.subheader("By Page")
+    def _by_page_table(df):
+        if df.empty:
+            return
         by_page = (
-            df_log.groupby("page")
-            .agg(
-                calls    =("api_calls",  "sum"),
-                in_tokens=("in_tokens",  "sum"),
-                out_tokens=("out_tokens", "sum"),
-                cost     =("cost",        "sum"),
-            )
-            .reset_index()
-            .sort_values("cost", ascending=False)
+            df.groupby("page")
+            .agg(calls=("api_calls","sum"), in_tokens=("in_tokens","sum"),
+                 out_tokens=("out_tokens","sum"), cost=("cost","sum"))
+            .reset_index().sort_values("cost", ascending=False)
         )
-        by_page["cost"] = by_page["cost"].map("${:.4f}".format)
+        by_page["cost"]       = by_page["cost"].map("${:.4f}".format)
         by_page["in_tokens"]  = by_page["in_tokens"].map("{:,}".format)
         by_page["out_tokens"] = by_page["out_tokens"].map("{:,}".format)
-        by_page.columns = ["Page", "API Calls", "Input Tokens", "Output Tokens", "Cost"]
+        by_page.columns = ["Page", "API Calls", "In Tokens", "Out Tokens", "Cost"]
         st.dataframe(by_page.set_index("Page"), use_container_width=True)
 
-        st.divider()
+    def _call_log_table(df):
+        if df.empty:
+            return
+        d = df[["date","time","page","model","in_tokens","out_tokens","api_calls","cost"]].copy()
+        d["cost"]       = d["cost"].map("${:.4f}".format)
+        d["in_tokens"]  = d["in_tokens"].map("{:,}".format)
+        d["out_tokens"] = d["out_tokens"].map("{:,}".format)
+        d.columns = ["Date","Time","Page","Model","In","Out","Calls","Cost"]
+        st.dataframe(d.set_index("Date"), use_container_width=True)
 
-        # ── Full call log ──────────────────────────────────────────────────────
-        st.subheader("Call Log")
-        df_display = df_log.copy()
-        df_display["cost"] = df_display["cost"].map("${:.4f}".format)
-        df_display["in_tokens"]  = df_display["in_tokens"].map("{:,}".format)
-        df_display["out_tokens"] = df_display["out_tokens"].map("{:,}".format)
-        df_display.columns = ["Time", "Page", "Model", "Input", "Output", "API Calls", "Cost"]
-        st.dataframe(df_display.set_index("Time"), use_container_width=True)
+    if not log:
+        st.info("No API calls recorded yet. Use the Compliance Chat or Product Lookup to generate some.")
+    else:
+        df_all     = pd.DataFrame(log)
+        df_session = df_all[df_all["session_id"] == sid]
+        df_prior   = df_all[df_all["session_id"] != sid]
 
-        st.divider()
-        if st.button("Clear usage log", type="secondary"):
-            st.session_state.token_log = []
-            st.rerun()
+        tab_session, tab_all = st.tabs(["This Session", "Since Inception"])
+
+        with tab_session:
+            _usage_metrics(df_session, "This Session")
+            if not df_session.empty:
+                st.divider()
+                st.markdown("**By page**")
+                _by_page_table(df_session)
+                st.divider()
+                st.markdown("**Call log**")
+                _call_log_table(df_session)
+
+        with tab_all:
+            _usage_metrics(df_all, "All Time")
+            if not df_all.empty:
+                st.divider()
+                st.markdown("**By page**")
+                _by_page_table(df_all)
+                st.divider()
+                st.markdown("**By session**")
+                by_sess = (
+                    df_all.groupby(["session_id","date"])
+                    .agg(calls=("api_calls","sum"), cost=("cost","sum"))
+                    .reset_index().sort_values("date", ascending=False)
+                )
+                by_sess["cost"] = by_sess["cost"].map("${:.4f}".format)
+                by_sess.columns = ["Session", "Date", "API Calls", "Cost"]
+                st.dataframe(by_sess.set_index("Session"), use_container_width=True)
+                st.divider()
+                st.markdown("**Full call log**")
+                _call_log_table(df_all)
