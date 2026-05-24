@@ -350,26 +350,8 @@ if page == "Introduction":
         "- What you allow it to do in your systems — connecting it to your existing processes through the same governance and audit controls you already have in place."
     )
 
-    # ── Triangle diagram ──────────────────────────────────────────────────────
-    if _svg:
-        components.html(
-            f"""<style>
-            body {{ margin:0; padding:0; background:transparent; }}
-            .diagram-wrap {{
-                background: rgba(83,74,183,0.05);
-                border: 1px solid rgba(83,74,183,0.14);
-                border-radius: 16px;
-                padding: 2rem 1.5rem 1.5rem;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }}
-            svg {{ width:100% !important; height:auto !important; max-width:580px; display:block; }}
-            </style>
-            <div class="diagram-wrap">{_svg}</div>""",
-            height=460,
-            scrolling=False,
-        )
+    # ── Framework diagram ─────────────────────────────────────────────────────
+    st.image("AI.png", use_container_width=False, width=520)
 
     st.markdown(
         "Done well, this is not a replacement for your people or your systems. "
@@ -383,11 +365,6 @@ if page == "Introduction":
     st.markdown('<p class="lp-section-label">Projects</p>', unsafe_allow_html=True)
 
     # ── Project card ──────────────────────────────────────────────────────────
-    import base64 as _b64
-    _ai_img = _b64.b64encode(
-        (Path(__file__).parent / "AI.png").read_bytes()
-    ).decode()
-
     st.markdown(
         '<div class="proj-card">'
         '<p class="proj-card-title">GCC Customs Compliance Engine &mdash; Dietary Supplements</p>'
@@ -402,7 +379,6 @@ if page == "Introduction":
         "lower-threshold country, apply a discount to clear stock before the window closes, "
         "or write off. A natural language compliance advisor lets warehouse managers ask "
         "questions directly and get specific, data-grounded answers.</p>"
-        f'<img src="data:image/png;base64,{_ai_img}" style="width:60%;display:block;margin:1.2rem auto 0.5rem;"/>'
         "</div>",
         unsafe_allow_html=True,
     )
