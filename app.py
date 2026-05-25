@@ -795,8 +795,34 @@ elif page == "Compliance Chat":
 elif page == "Risk Actions":
     components.html(_SCROLL_JS, height=0, scrolling=False)
     st.header("Risk Actions & Recommendations")
+    _notes("""\
+I haven't spent too much time on this page — I simply asked Claude to create a discounting
+action when a product approaches its UAE import threshold.
 
-    tab1, tab2, tab3, tab4 = st.tabs(["Reroute to Lower-Threshold Countries", "Discount Candidates", "Fully Blocked", "Halal Certification"])
+It's not very realistic. You probably shouldn't be discounting a product just because it's
+approaching its UAE shelf-life threshold — the point at which remaining shelf life drops
+below 75% and the product can no longer clear UAE customs. What about the other five
+countries? What's the sales profile of that product anyway? It may sell predominantly in
+Saudi Arabia, in which case the UAE threshold is largely irrelevant.
+
+To give adequate decision support here you would want to plug this into a **forecast model**
+— something like XGBoost would do it — generate a demand forecast by country, and only
+recommend discounting when the forecast suggests you cannot sell through the stock before
+the compliance window closes. That is a significantly more useful signal than a simple
+threshold comparison.
+
+---
+
+**A note on AI vs ML**
+
+The market seems to be confused between the two. **Machine Learning is not AI** — it never
+has been and never will be. ML is a mathematical model applied to data: gradient descent,
+decision trees, regression. It finds patterns. It does not reason.
+
+**AI** is an interpretation of cause and effect, working over data to arrive at conclusions,
+weigh trade-offs, and recommend action. The demand forecast is ML. The advisor that decides
+what to do with it is AI. Both are useful. They are not the same thing.
+""")
 
     # ── Tab 1: Reroute ────────────────────────────────────────────────────────
     with tab1:
