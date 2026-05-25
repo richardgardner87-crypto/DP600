@@ -824,6 +824,13 @@ weigh trade-offs, and recommend action. The demand forecast is ML. The advisor t
 what to do with it is AI. Both are useful. They are not the same thing.
 """)
 
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "Reroute to Lower-Threshold Countries",
+        "Discount Candidates",
+        "Fully Blocked",
+        "Halal Certification",
+    ])
+
     # ── Tab 1: Reroute ────────────────────────────────────────────────────────
     with tab1:
         st.markdown(
