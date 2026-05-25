@@ -126,7 +126,7 @@ with st.sidebar:
     st.caption("Dietary Supplements — Allocation Risk Monitor")
     st.divider()
 
-    _pages = ["Introduction", "Architecture", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage"]
+    _pages = ["Introduction", "Process Flow", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage"]
     _idx = _pages.index(st.session_state.get("nav_page", "Introduction"))
     page = st.radio(
         "Navigate",
@@ -1360,9 +1360,9 @@ elif page == "Token Usage":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE — ARCHITECTURE
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "Architecture":
+elif page == "Process Flow":
     components.html(_SCROLL_JS, height=0, scrolling=False)
-    st.header("System Architecture")
+    st.header("Process Flow")
     st.caption("How the compliance engine plugs in to existing 3PL processes.")
     _notes("""
 **What this diagram shows**
