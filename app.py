@@ -1367,22 +1367,25 @@ elif page == "Process Flow":
     _notes("""
 **What this diagram shows**
 
-The flow runs left-to-right across three main stages:
+The flow covers two distinct processes that run in parallel:
 
-- **Product Setup** — when a client advises a new product, it is run through the Product Lookup
-  classifier before it can enter the Product Master. Nothing reaches the master file unless it has
-  passed compliance.
+**Product onboarding (left column)**
+When a client advises a new product, it is classified by the AI Compliance Engine before it can
+enter the Product Master. HS codes are checked, ingredients are screened against GCC banned and
+restricted lists, halal requirements are assessed, and shelf-life viability is confirmed for the
+intended destination. Nothing enters the Product Master unless it clears this gate. Products that
+fail are routed to Compliance Reporting.
 
-- **Advanced Shipping Notification** — when stock is enroute, the Product Master Check confirms
-  the inbound SKU is approved. Non-compliant or unrecognised products are flagged for exception
-  reporting or quarantine before they reach the warehouse floor.
+**Inbound shipments (right column)**
+When stock is enroute, an Advanced Shipping Notification triggers the receiving process. On
+arrival, products are checked against the Product Master — this is an operational gate, not an AI
+function. Stock that cannot be matched or has not passed compliance is quarantined or refused.
+Stock that clears is received into inventory.
 
-- **AI Insights** — once stock is live in inventory, Claude monitors compliance continuously:
-  shelf-life thresholds, ingredient flags, halal requirements. This is the ongoing advisory layer
-  rather than a one-time gate.
+**The AI plays two different roles in this process** — see the cards below.
 
-The **ERP System** sits at the base — it is the system of record that receives clean, validated
-product data after it has passed through the compliance engine.
+The **ERP System** sits at the base as the system of record, receiving clean validated product
+data after it has passed through the compliance engine.
 """)
 
     _arch_img = Path(__file__).parent / "architecture_slide.png"
