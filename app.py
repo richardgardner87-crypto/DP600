@@ -126,7 +126,7 @@ with st.sidebar:
     st.caption("Dietary Supplements — Allocation Risk Monitor")
     st.divider()
 
-    _pages = ["Introduction", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage"]
+    _pages = ["Introduction", "Architecture", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage"]
     _idx = _pages.index(st.session_state.get("nav_page", "Introduction"))
     page = st.radio(
         "Navigate",
@@ -1355,3 +1355,38 @@ elif page == "Token Usage":
                 st.divider()
                 st.markdown("**Full call log**")
                 _call_log_table(df_all)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE — ARCHITECTURE
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "Architecture":
+    components.html(_SCROLL_JS, height=0, scrolling=False)
+    st.header("System Architecture")
+    st.caption("How the compliance engine plugs in to existing 3PL processes.")
+    _notes("""
+**What this diagram shows**
+
+The flow runs left-to-right across three main stages:
+
+- **Product Setup** — when a client advises a new product, it is run through the Product Lookup
+  classifier before it can enter the Product Master. Nothing reaches the master file unless it has
+  passed compliance.
+
+- **Advanced Shipping Notification** — when stock is enroute, the Product Master Check confirms
+  the inbound SKU is approved. Non-compliant or unrecognised products are flagged for exception
+  reporting or quarantine before they reach the warehouse floor.
+
+- **AI Insights** — once stock is live in inventory, Claude monitors compliance continuously:
+  shelf-life thresholds, ingredient flags, halal requirements. This is the ongoing advisory layer
+  rather than a one-time gate.
+
+The **ERP System** sits at the base — it is the system of record that receives clean, validated
+product data after it has passed through the compliance engine.
+""")
+
+    _arch_img = Path(__file__).parent / "architecture_slide.png"
+    if _arch_img.exists():
+        st.image(str(_arch_img), use_container_width=True)
+    else:
+        st.warning("architecture_slide.png not found. Run the PowerShell export step to regenerate it.")
