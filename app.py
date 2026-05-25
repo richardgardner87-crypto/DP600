@@ -1390,3 +1390,48 @@ product data after it has passed through the compliance engine.
         st.image(str(_arch_img), use_container_width=True)
     else:
         st.warning("architecture_slide.png not found. Run the PowerShell export step to regenerate it.")
+
+    st.markdown("---")
+    components.html("""
+<style>
+  .ai-role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 8px 0 4px; font-family: sans-serif; }
+  .ai-role-card { border-radius: 10px; padding: 22px 26px 20px; }
+  .ai-role-card.gatekeeper { background: #1A2340; color: #fff; }
+  .ai-role-card.monitor    { background: #00D4AA; color: #0a3a30; }
+  .ai-role-card h3 { margin: 0 0 4px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; }
+  .ai-role-card h2 { margin: 0 0 14px; font-size: 20px; font-weight: 700; }
+  .ai-role-card p  { margin: 0 0 10px; font-size: 14px; line-height: 1.6; }
+  .ai-role-card p:last-child { margin-bottom: 0; }
+  .ai-role-card .tag { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 14px; }
+  .gatekeeper .tag { background: rgba(255,255,255,0.15); color: #fff; }
+  .monitor    .tag { background: rgba(0,0,0,0.12); color: #0a3a30; }
+</style>
+<div class="ai-role-grid">
+
+  <div class="ai-role-card gatekeeper">
+    <h3>Role 1</h3>
+    <h2>Compliance Gatekeeper</h2>
+    <span class="tag">Pre-landing &mdash; one-time</span>
+    <p>When a new product is introduced, the AI classifies it against GCC customs rules before
+    it can enter the Product Master. It checks HS codes, flags banned or restricted ingredients,
+    assesses halal requirements, and confirms the shelf life is viable for the intended destination.</p>
+    <p>The outcome is binary: the product either passes and enters the master file, or it is
+    flagged for compliance reporting and does not proceed. Nothing lands in the system without
+    clearing this gate.</p>
+  </div>
+
+  <div class="ai-role-card monitor">
+    <h3>Role 2</h3>
+    <h2>Ongoing Compliance Monitor</h2>
+    <span class="tag">Post-landing &mdash; continuous</span>
+    <p>Once stock is live in the warehouse, compliance doesn&rsquo;t stop. Shelf life erodes daily
+    &mdash; a product that met UAE&rsquo;s 75% threshold last month may not meet it today. A product
+    can be received with permissible ingredients but without its halal certificate: it can be stocked
+    but not yet shipped.</p>
+    <p>The AI monitors these states continuously, surfacing which products are approaching a threshold,
+    which are on hold pending paperwork, and which destinations are still viable &mdash; so the
+    warehouse team can act before stock becomes a write-off.</p>
+  </div>
+
+</div>
+""", height=380)
