@@ -105,18 +105,35 @@ class TokenLogger:
     def query_df(self) -> pd.DataFrame:
         """
         Return all usage rows for this project as a DataFrame.
-        Uses DuckDB to read directly from Azure Blob Storage via wildcard.
-        Returns an empty DataFrame (correct columns) if no data exists yet.
+        Tries DuckDB first (more efficient); falls back to downloading each
+        daily blob directly via azure-storage-blob if DuckDB's Azure extension
+        is unavailable (e.g. Streamlit Cloud sandbox).
         """
+        # ── Primary: DuckDB wildcard query ────────────────────────────────────
         try:
             import duckdb
             db = duckdb.connect()
             db.execute("INSTALL azure; LOAD azure;")
             db.execute(f"SET azure_storage_connection_string='{self._conn_str}';")
-            df = db.sql(
+            return db.sql(
                 f"SELECT * FROM 'azure://{_CONTAINER}/{self.project_id}/*.parquet'"
                 f" ORDER BY date, time"
             ).df()
-            return df
         except Exception:
-            return pd.DataFrame(columns=COLUMNS)
+            pass
+
+        # ── Fallback: download blobs one by one ───────────────────────────────
+        try:
+            container_client = self._service().get_container_client(_CONTAINER)
+            prefix = f"{self.project_id}/"
+            frames = []
+            for blob in container_client.list_blobs(name_starts_with=prefix):
+                if blob.name.endswith(".parquet"):
+                    raw = container_client.get_blob_client(blob.name).download_blob().readall()
+                    frames.append(pd.read_parquet(io.BytesIO(raw)))
+            if frames:
+                return pd.concat(frames, ignore_index=True).sort_values(["date", "time"], ignore_index=True)
+        except Exception:
+            pass
+
+        return pd.DataFrame(columns=COLUMNS)

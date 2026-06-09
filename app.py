@@ -1301,6 +1301,10 @@ elif page == "Token Usage":
         d.columns = ["Date","Time","Page","Model","In","Out","Calls","Cost"]
         st.dataframe(d.set_index("Date"), use_container_width=True)
 
+    @st.cache_data(ttl=300, show_spinner="Loading usage history…")
+    def _load_all_usage():
+        return _token_logger.query_df()
+
     tab_session, tab_all = st.tabs(["This Session", "Since Inception"])
 
     with tab_session:
@@ -1318,9 +1322,6 @@ elif page == "Token Usage":
         col_refresh, _ = st.columns([1, 5])
         if col_refresh.button("Refresh", use_container_width=True):
             st.cache_data.clear()
-        @st.cache_data(ttl=300, show_spinner="Loading usage history…")
-        def _load_all_usage():
-            return _token_logger.query_df()
         df_all = _load_all_usage()
         _usage_metrics(df_all, "All Time")
         if not df_all.empty:
