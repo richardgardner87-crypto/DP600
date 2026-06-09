@@ -1321,9 +1321,16 @@ elif page == "Token Usage":
         col_refresh, _ = st.columns([1, 5])
         if col_refresh.button("Refresh", use_container_width=True):
             st.cache_data.clear()
-        az_ok, az_msg = _token_logger.connection_status()
-        if not az_ok:
-            st.error(f"Azure connection failed: {az_msg}")
+        conn_str_present = bool(os.getenv("AZURE_STORAGE_CONNECTION_STRING"))
+        st.caption(f"Azure connection string present: {conn_str_present}")
+        try:
+            from azure.storage.blob import BlobServiceClient
+            _svc = BlobServiceClient.from_connection_string(os.getenv("AZURE_STORAGE_CONNECTION_STRING", ""))
+            _cc  = _svc.get_container_client("token-logs")
+            blobs = [b.name for b in _cc.list_blobs(name_starts_with="iherb-gcc/")]
+            st.caption(f"Blobs found: {blobs}")
+        except Exception as _e:
+            st.error(f"Azure error: {_e}")
         df_all = _load_all_usage()
         _usage_metrics(df_all, "All Time")
         if not df_all.empty:
