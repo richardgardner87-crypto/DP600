@@ -106,6 +106,16 @@ class TokenLogger:
 
         return row
 
+    def connection_status(self) -> tuple[bool, str]:
+        """Return (ok, message) — used by the UI to surface Azure errors."""
+        try:
+            conn = self._conn_str()
+            container_client = self._service().get_container_client(_CONTAINER)
+            list(container_client.list_blobs(name_starts_with=f"{self.project_id}/", max_results=1))
+            return True, "Connected"
+        except Exception as exc:
+            return False, str(exc)
+
     def query_df(self) -> pd.DataFrame:
         """
         Return all usage rows for this project as a DataFrame.

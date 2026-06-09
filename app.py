@@ -1321,6 +1321,9 @@ elif page == "Token Usage":
         col_refresh, _ = st.columns([1, 5])
         if col_refresh.button("Refresh", use_container_width=True):
             st.cache_data.clear()
+        az_ok, az_msg = _token_logger.connection_status()
+        if not az_ok:
+            st.error(f"Azure connection failed: {az_msg}")
         df_all = _load_all_usage()
         _usage_metrics(df_all, "All Time")
         if not df_all.empty:
