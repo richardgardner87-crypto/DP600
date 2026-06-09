@@ -19,6 +19,12 @@ from engine.rules import (
 
 load_dotenv()
 
+# Streamlit Cloud stores secrets in st.secrets — push them into env before
+# anything tries to read them via os.getenv() (including TokenLogger init).
+for _k in ("ANTHROPIC_API_KEY", "APIFY_TOKEN", "AZURE_STORAGE_CONNECTION_STRING"):
+    if _k in st.secrets and not os.getenv(_k):
+        os.environ[_k] = st.secrets[_k]
+
 # Seed navigation state before any widget is rendered
 if "nav_page" not in st.session_state:
     st.session_state["nav_page"] = "Introduction"
@@ -48,13 +54,6 @@ def _notes(content: str, label: str = "Notes"):
     """Render a floating Notes popover button."""
     with st.popover(f"📝 {label}"):
         st.markdown(content)
-
-
-# Streamlit Cloud stores secrets in st.secrets — push them into env so all
-# modules (advisor, scraper) pick them up via os.getenv() unchanged.
-for _k in ("ANTHROPIC_API_KEY", "APIFY_TOKEN", "AZURE_STORAGE_CONNECTION_STRING"):
-    if _k in st.secrets and not os.getenv(_k):
-        os.environ[_k] = st.secrets[_k]
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
