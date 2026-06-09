@@ -1,0 +1,105 @@
+product_id,product_name,brand,category,hs_code,ingredients,halal_certified,country_of_origin
+SKU001,Vitamin D3 2000IU 120 Capsules (Vegan),NOW Foods,Vitamins,2936.29,"Vitamin D3 Cholecalciferol, Cellulose, Magnesium Stearate",yes,USA
+SKU002,Vitamin C 1000mg 100 Tablets,NOW Foods,Vitamins,2936.27,"Ascorbic Acid, Cellulose, Stearic Acid, Magnesium Stearate",yes,USA
+SKU003,Magnesium Glycinate 400mg 180 Capsules,Doctors Best,Minerals,2106.9,"Magnesium Glycinate Chelate, Cellulose, Magnesium Stearate",yes,USA
+SKU004,Zinc Picolinate 50mg 120 Capsules,NOW Foods,Minerals,2106.9,"Zinc Picolinate, Cellulose, Magnesium Stearate",yes,USA
+SKU005,Vitamin B Complex 100 Capsules,Jarrow Formulas,Vitamins,2106.9,"Thiamine HCl, Riboflavin, Niacinamide, Pyridoxine B6, Methylfolate, Methylcobalamin, Biotin, Pantothenic Acid, Cellulose",yes,USA
+SKU006,Multivitamin Mens 120 Tablets,Garden of Life,Vitamins,2106.9,"Vitamin A Acetate, Ascorbic Acid, Cholecalciferol, d-Alpha Tocopherol, Thiamine, Riboflavin, Niacinamide, Pyridoxine, Methylfolate, Methylcobalamin, Zinc, Selenium, Organic Spinach",yes,USA
+SKU007,Multivitamin Womens 120 Tablets,Garden of Life,Vitamins,2106.9,"Vitamin A, Ascorbic Acid, Cholecalciferol, d-Alpha Tocopherol, Menaquinone K2, Methylfolate, Methylcobalamin, Iron, Calcium Carbonate, Magnesium Oxide, Organic Cranberry Extract",yes,USA
+SKU008,Ashwagandha KSM-66 600mg 90 Capsules,Jarrow Formulas,Adaptogen,1302.19,"Ashwagandha Root Extract KSM-66 Withania somnifera, Cellulose, Magnesium Stearate",yes,India
+SKU009,Turmeric Curcumin 500mg 60 Capsules,NOW Foods,Herbal,1302.19,"Turmeric Root Extract 95% Curcuminoids, Black Pepper Extract BioPerine, Cellulose",yes,India
+SKU010,Creatine Monohydrate 500g,Optimum Nutrition,Sports,2106.9,Creatine Monohydrate,yes,Germany
+SKU011,Spirulina 500mg 200 Tablets,NOW Foods,Superfoods,2106.9,"Spirulina Arthrospira platensis, Cellulose, Magnesium Stearate",yes,USA
+SKU012,Vitamin B12 Methylcobalamin 1000mcg 100 Tablets,Jarrow Formulas,Vitamins,2936.26,"Methylcobalamin, Mannitol, Cellulose, Magnesium Stearate",yes,USA
+SKU013,Quercetin 500mg 60 Capsules,NOW Foods,Antioxidants,2106.9,"Quercetin Dihydrate, Cellulose, Magnesium Stearate",yes,USA
+SKU014,Berberine HCl 500mg 60 Capsules,Thorne Research,Metabolic,2106.9,"Berberine HCl, Cellulose, Magnesium Stearate",yes,China
+SKU015,Lions Mane Mushroom 500mg 60 Capsules,Host Defense,Cognitive,1302.19,"Lions Mane Mushroom Hericium erinaceus Mycelium and Fruiting Bodies, Cellulose",yes,USA
+SKU016,Alpha Lipoic Acid 600mg 60 Capsules,Doctors Best,Antioxidants,2106.9,"Alpha Lipoic Acid, Cellulose, Magnesium Stearate",yes,USA
+SKU017,NAC N-Acetyl Cysteine 600mg 100 Capsules,NOW Foods,Antioxidants,2106.9,"N-Acetyl-L-Cysteine, Cellulose, Magnesium Stearate",yes,USA
+SKU018,Maca Root 500mg 100 Capsules,NOW Foods,Hormonal,1211.9,"Maca Root Powder Lepidium meyenii, Cellulose, Magnesium Stearate",yes,Peru
+SKU019,Rhodiola Rosea 500mg 60 Capsules,NOW Foods,Adaptogen,1302.19,"Rhodiola Rosea Root Extract 3% Rosavins 1% Salidroside, Cellulose",yes,Russia
+SKU020,BCAAs 2:1:1 300g Unflavoured,NOW Sports,Sports,2922.41,"L-Leucine, L-Isoleucine, L-Valine",yes,USA
+SKU021,L-Glutamine 500g,Jarrow Formulas,Sports,2922.41,L-Glutamine,yes,USA
+SKU022,Black Seed Oil 500mg 90 Capsules Vegan,Amazing Herbs,Herbal,1515.9,"Black Cumin Seed Oil Nigella sativa, Cellulose Capsule",yes,Egypt
+SKU023,Moringa Leaf Powder 240g Organic,Kiva,Superfoods,1211.9,Organic Moringa Oleifera Leaf Powder,yes,India
+SKU024,Pea Protein Isolate Unflavoured 1kg,NOW Sports,Protein,2106.1,Pea Protein Isolate Pisum sativum,yes,Canada
+SKU025,Selenium 200mcg 90 Capsules,NOW Foods,Minerals,2106.9,"Selenium Glycinate Complex, Cellulose, Magnesium Stearate",yes,USA
+SKU026,Vitamin K2 MK-7 100mcg 60 Capsules,Life Extension,Vitamins,2936.29,"Menaquinone-7 from Natto, Cellulose, Calcium Phosphate",yes,Japan
+SKU027,CoQ10 Ubiquinol 100mg 60 Capsules,Jarrow Formulas,Vitamins,2106.9,"Ubiquinol CoQ10, Sunflower Oil, Beeswax, Cellulose",yes,Japan
+SKU028,Folate 5-MTHF 800mcg 100 Capsules,Thorne Research,Vitamins,2936.29,"5-Methyltetrahydrofolate Calcium Salt, Cellulose, Magnesium Citrate",yes,USA
+SKU029,Vitamin E Mixed Tocopherols 400IU 100 Capsules,NOW Foods,Vitamins,2936.28,"d-Alpha Tocopherol, d-Beta d-Gamma d-Delta Tocopherols, Cellulose, Magnesium Stearate",yes,USA
+SKU030,Selenium plus Molybdenum 90 Capsules,NOW Foods,Minerals,2106.9,"Selenium Amino Acid Chelate, Molybdenum Glycinate Chelate, Cellulose, Stearic Acid",yes,USA
+SKU031,Iodine 225mcg 180 Capsules,Biotics Research,Minerals,2106.9,"Potassium Iodide, Kelp Powder, Cellulose, Stearic Acid",yes,USA
+SKU032,Chromium Picolinate 200mcg 100 Capsules,NOW Foods,Minerals,2106.9,"Chromium Picolinate, Cellulose, Magnesium Stearate",yes,USA
+SKU033,Iron Bisglycinate 25mg 90 Capsules,Thorne Research,Minerals,2106.9,"Iron Bisglycinate Chelate, Hypromellose, Magnesium Citrate",yes,USA
+SKU034,Manganese 10mg 250 Capsules,NOW Foods,Minerals,2106.9,"Manganese Glycinate Chelate, Cellulose, Magnesium Stearate",yes,USA
+SKU035,Digestive Enzymes 90 Capsules,NOW Foods,Digestive,2106.9,"Amylase, Protease, Lipase, Lactase, Cellulase, Bromelain, Papain, Cellulose",yes,USA
+SKU036,Milk Thistle 300mg 100 Capsules,NOW Foods,Herbal,1302.19,"Milk Thistle Extract 80% Silymarin, Cellulose, Magnesium Stearate",yes,Europe
+SKU037,Reishi Mushroom 500mg 100 Capsules,NOW Foods,Immunity,1302.19,"Reishi Mushroom Extract Ganoderma lucidum, Cellulose, Magnesium Stearate",yes,China
+SKU038,Saw Palmetto 320mg 60 Capsules,NOW Foods,Herbal,1302.19,"Saw Palmetto Berry Powder, Cellulose, Magnesium Stearate",yes,USA
+SKU039,Valerian Root 500mg 100 Capsules,Natures Way,Herbal,1211.9,"Valerian Root Powder, Cellulose, Magnesium Stearate",yes,Europe
+SKU040,Echinacea 400mg 100 Capsules,Natures Way,Immunity,1211.9,"Echinacea purpurea Aerial Parts Powder, Cellulose, Magnesium Stearate",yes,USA
+SKU041,Elderberry 1000mg 60 Capsules,Natures Answer,Immunity,1302.19,"Black Elderberry Extract Sambucus nigra, Cellulose, Magnesium Stearate",yes,USA
+SKU042,Lemon Balm 500mg 100 Capsules,NOW Foods,Mood,1211.9,"Lemon Balm Leaf Powder Melissa officinalis, Cellulose, Magnesium Stearate",yes,Europe
+SKU043,Passionflower 350mg 90 Capsules,NOW Foods,Mood,1211.9,"Passionflower Aerial Parts Passiflora incarnata, Cellulose, Magnesium Stearate",yes,Europe
+SKU044,St Johns Wort 300mg 100 Tablets,Natures Sunshine,Mood,1302.19,"Hypericum perforatum Extract 0.3% Hypericin, Cellulose, Stearic Acid",yes,Germany
+SKU045,Bacopa Monnieri 320mg 60 Capsules,Jarrow Formulas,Cognitive,1302.19,"Bacopa monnieri Leaf Extract 20% Bacosides, Cellulose, Magnesium Stearate",yes,India
+SKU046,Saffron Extract 88.5mg 60 Capsules,Life Extension,Mood,1302.19,"Affron Saffron Extract Crocus sativus, Cellulose, Magnesium Stearate",yes,Spain
+SKU047,Chlorella Powder 200g,Sun Chlorella,Superfoods,2106.9,Chlorella Broken Cell Wall Powder,yes,Japan
+SKU048,Green Tea Extract 400mg 100 Capsules,NOW Foods,Antioxidants,2106.9,"Green Tea Extract 50% EGCG Camellia sinensis, Cellulose, Magnesium Stearate",yes,China
+SKU049,Ginger Root 550mg 100 Capsules,NOW Foods,Digestive,1211.9,"Ginger Root Powder Zingiber officinale, Cellulose, Magnesium Stearate",yes,India
+SKU050,Cinnamon Bark 600mg 120 Capsules,NOW Foods,Metabolic,1302.19,"Ceylon Cinnamon Bark Powder Cinnamomum verum, Cellulose, Magnesium Stearate",yes,Sri Lanka
+SKU051,Fenugreek 610mg 100 Capsules,NOW Foods,Herbal,1211.9,"Fenugreek Seed Powder Trigonella foenum-graecum, Cellulose, Magnesium Stearate",yes,India
+SKU052,Ginkgo Biloba 60mg 60 Tablets,Solgar,Herbal,1302.19,"Ginkgo Biloba Leaf Extract 24% Flavone Glycosides, Cellulose, Stearic Acid",yes,China
+SKU053,Vitamin A 10000IU 100 Capsules,NOW Foods,Vitamins,2936.21,"Vitamin A Palmitate, Cellulose, Magnesium Stearate",yes,USA
+SKU054,Biotin 5000mcg 60 Capsules,NOW Foods,Beauty,2936.29,"Biotin, Cellulose, Magnesium Stearate",yes,USA
+SKU055,Pre-Workout Energy Powder 300g,Legion Athletics,Sports,2106.9,"Citrulline Malate, Beta-Alanine, Caffeine Anhydrous 350mg, L-Theanine, Alpha-GPC, Natural Flavors",yes,USA
+SKU056,Protein Bar Variety 12-Pack,Quest Nutrition,Protein,2106.9,"Whey Protein Isolate, Milk Protein Isolate, Almonds, Erythritol, Natural Flavors, Sunflower Lecithin",yes,USA
+SKU057,Probiotic 30 Billion 60 Capsules,Jarrow Formulas,Probiotics,2106.9,"Lactobacillus acidophilus, Bifidobacterium lactis, L. rhamnosus, L. gasseri, Cellulose, Maltodextrin",yes,USA
+SKU058,NAD+ Nicotinamide Riboside 300mg 60 Caps,Tru Niagen,Antioxidants,2106.9,"Nicotinamide Riboside Chloride, Cellulose, Magnesium Stearate",yes,USA
+SKU059,Acetyl L-Carnitine 500mg 100 Capsules,Jarrow Formulas,Cognitive,2922.41,"Acetyl L-Carnitine HCl, Cellulose, Magnesium Stearate",yes,Italy
+SKU060,Magnesium Citrate 250mg (old batch),NOW Foods,Minerals,2106.9,"Magnesium Citrate, Cellulose, Magnesium Stearate",yes,USA
+SKU061,CBD Oil 1000mg 30ml,Charlottes Web,CBD,2934.99,"Hemp Extract Aerial Parts, Fractionated Coconut Oil, Natural Flavor, Cannabidiol CBD",yes,USA
+SKU062,CBD Gummies 25mg 30 Count,Green Roads,CBD,2934.99,"Hemp-Derived CBD Cannabidiol, Glucose Syrup, Sugar, Pectin, Citric Acid, Natural Flavors",yes,USA
+SKU063,DMAA Pre-Workout 300g,Jack3d,Pre-workout,2106.9,"Caffeine Anhydrous, 1,3-Dimethylamylamine DMAA, Beta-Alanine, Creatine Monohydrate, Citric Acid",no,USA
+SKU064,Ephedra Extract 12.5mg 100 Tablets,Generic Brand,Weight,1302.19,"Ephedra sinica Extract 8% Ephedrine Alkaloids, Caffeine Anhydrous, Guarana Seed Extract, Cellulose",no,China
+SKU065,Kava Root Extract 250mg 60 Capsules,NOW Foods,Herbal,1302.19,"Kava Root Extract Piper methysticum 30% Kavalactones, Cellulose, Magnesium Stearate",yes,Pacific Islands
+SKU066,Yohimbe Bark 500mg 90 Capsules,NOW Foods,Herbal,1302.19,"Yohimbe Bark Extract standardized to 8% Yohimbine, Gelatin, Magnesium Stearate",no,Africa
+SKU067,5-HTP 100mg 60 Capsules,NOW Foods,Mood,2934.99,"5-Hydroxytryptophan 5-HTP from Griffonia simplicifolia, Cellulose, Magnesium Stearate",yes,Africa
+SKU068,Bitter Orange Synephrine 300mg 60 Capsules,NOW Foods,Weight,1302.19,"Bitter Orange Extract Citrus aurantium standardized to 6% Synephrine, Cellulose, Magnesium Stearate",yes,China
+SKU069,Melatonin 3mg 120 Tablets,Natrol,Sleep,2934.99,"Melatonin, Dicalcium Phosphate, Cellulose, Stearic Acid, Silica",yes,USA
+SKU070,Melatonin 5mg 60 Tablets,NOW Foods,Sleep,2934.99,"Melatonin, Cellulose, Stearic Acid, Silica, Magnesium Stearate",yes,USA
+SKU071,Melatonin 10mg Extended Release 60 Capsules,Life Extension,Sleep,2934.99,"Melatonin, Cellulose, Vegetable Stearate, Silica",yes,USA
+SKU072,Omega-3 Fish Oil 1000mg 100 Softgels,Nordic Naturals,Omega,1504.2,"Fish Oil Concentrate from Anchovies and Sardines, Gelatin, Glycerin, Water, Natural Lemon Flavor",no,Norway
+SKU073,Omega-3 Fish Oil 2000mg 60 Softgels,Carlson Labs,Omega,1504.2,"Norwegian Fish Oil, Gelatin, Glycerin, Purified Water, Natural Lemon Oil",no,Norway
+SKU074,Collagen Peptides Powder 284g,Vital Proteins,Beauty,3504.0,"Bovine Hide Collagen Peptides from grass-fed cows, Vitamin C",no,USA
+SKU075,Marine Collagen 120 Capsules,NeoCell,Beauty,3504.0,"Marine Collagen Peptides from Fish, Vitamin C, Hyaluronic Acid, Gelatin",no,USA
+SKU076,Hydrolyzed Collagen Type I and III 450g,Great Lakes Wellness,Beauty,3504.0,"Hydrolyzed Bovine Collagen Peptides, Natural Flavor",no,USA
+SKU077,Whey Protein Isolate Vanilla 2lb,Optimum Nutrition,Protein,2106.1,"Whey Protein Isolate, Natural Vanilla Flavor, Sunflower Lecithin, Sucralose",no,USA
+SKU078,Whey Protein Chocolate 5lb,Optimum Nutrition,Protein,2106.1,"Whey Protein Concentrate, Cocoa Powder, Natural Flavors, Sunflower Lecithin, Sucralose",no,USA
+SKU079,Casein Protein Chocolate 2lb,Optimum Nutrition,Protein,2106.1,"Micellar Casein, Cocoa, Natural Flavors, Sucralose, Acesulfame Potassium",no,USA
+SKU080,Glucosamine Sulfate 1000mg 120 Tablets,Doctors Best,Joint Health,2106.9,"Glucosamine Sulfate 2KCl from Shellfish, Cellulose, Vegetable Stearate",no,USA
+SKU081,Chondroitin Sulfate 400mg 90 Capsules,NOW Foods,Joint Health,2106.9,"Chondroitin Sulfate from Bovine Trachea, Cellulose, Magnesium Stearate",no,USA
+SKU082,Vitamin D3 5000IU 240 Softgels,NOW Foods,Vitamins,2936.29,"Vitamin D3 Cholecalciferol, Soybean Oil, Gelatin, Glycerin, Water",no,USA
+SKU083,Vitamin E 400IU 100 Softgels,NOW Foods,Vitamins,2936.28,"d-Alpha Tocopherol, Soybean Oil, Gelatin, Glycerin, Water",yes,USA
+SKU084,Astaxanthin 4mg 60 Softgels,NOW Foods,Antioxidants,2106.9,"AstaREAL Astaxanthin from Haematococcus pluvialis, Olive Oil, Gelatin, Glycerin, Water",no,Japan
+SKU085,Lutein 20mg 60 Softgels,NOW Foods,Eye Health,2106.9,"Lutein from Marigold Tagetes erecta, Zeaxanthin, Olive Oil, Gelatin, Glycerin, Water",no,India
+SKU086,CoQ10 100mg 60 Softgels,Jarrow Formulas,Vitamins,2106.9,"Coenzyme Q10 Ubiquinone, Rice Bran Oil, Gelatin, Glycerin, Purified Water",no,Japan
+SKU087,Vitamin K2 MK-7 100mcg Softgels,NOW Foods,Vitamins,2936.29,"Menaquinone-7 from Natto, Extra Virgin Olive Oil, Gelatin, Glycerin, Water",no,USA
+SKU088,Phosphatidylserine 100mg 60 Softgels,NOW Foods,Cognitive,2106.9,"Phosphatidylserine from Soy Lecithin, Soybean Oil, Gelatin, Glycerin",no,USA
+SKU089,Saw Palmetto 320mg 60 Softgels,NOW Foods,Herbal,1302.19,"Saw Palmetto Berry Extract, Olive Oil, Gelatin, Glycerin, Water",no,USA
+SKU090,Evening Primrose Oil 500mg 100 Softgels,NOW Foods,Womens Health,1515.9,"Evening Primrose Oil Oenothera biennis, Gelatin, Glycerin, Water",no,USA
+SKU091,Cod Liver Oil 1000mg 90 Softgels,NOW Foods,Omega,1504.2,"Cod Liver Oil Gadus morhua, Vitamin A, Vitamin D3, Gelatin, Glycerin, Water",no,Norway
+SKU092,Bone Broth Protein Powder 400g,Ancient Nutrition,Protein,3504.0,"Hydrolyzed Bovine Bone Broth Protein Concentrate, Natural Flavors",no,USA
+SKU093,Fish Collagen Peptides 5000mg Powder,Vital Proteins,Beauty,3504.0,"Hydrolyzed Fish Collagen Peptides Type I, Vitamin C, Natural Flavor",no,USA
+SKU094,Omega-3 Fish Oil UAE Breach Imminent,Garden of Life,Omega,1504.2,"Fish Oil from Wild Sardines Mackerel Anchovies, Gelatin, Glycerin, Water, Rosemary Extract",no,USA
+SKU095,Collagen Peptides UAE-Failed KSA-Clear,Sports Research,Beauty,3504.0,"Bovine Collagen Peptides Type I and III, Sunflower Lecithin",no,USA
+SKU096,Whey Protein All-Failed,Dymatize,Protein,2106.1,"Whey Protein Isolate, Soy Lecithin, Natural Flavors, Sucralose",no,USA
+SKU097,Hyaluronic Acid 120mg Gelatin Capsule,Solgar,Beauty,2106.9,"Sodium Hyaluronate, Gelatin, Water",no,USA
+SKU098,Vitamin D3+K2 60 Softgels,Life Extension,Vitamins,2936.29,"Vitamin D3 Cholecalciferol, Vitamin K2 MK-7 from Natto, Olive Oil, Gelatin, Glycerin",no,USA
+SKU099,Astaxanthin 12mg 60 Softgels,Sports Research,Antioxidants,2106.9,"Astaxanthin from Haematococcus pluvialis, Coconut Oil, Gelatin, Glycerin, Water",no,USA
+SKU100,Glucosamine Chondroitin MSM 90 Tablets,NOW Foods,Joint Health,2106.9,"Glucosamine Sulfate from Shellfish, Chondroitin Sulfate from Bovine, MSM Methylsulfonylmethane, Cellulose",no,USA
+SKU-00101,"21st Century, Herbal Slimming Tea, Honey Lemon, Caffeine Free, 24 Tea Bags",21st Century,Vitamins,2106.9,"Senna Leaf, Malva Leaf, Cassia Angustifolia Pod, Ginger Root, Gardenia Jasminoides Fruit, Licorice Root, Chrysanthemum Flower, Natural Honey Lemon Flavor, Stevia Leaf Extract",no,USA
+SKU-00102,"California Gold Nutrition, Rexdrive® Amino with L-Arginine HCl, L-Citrulline, Acetyl-L-Carnitine Arginate DiHydrochloride, and Glycine Propionyl-L-Carnitine HCl, Men's Formula, 60 Veggie Capsules",California Gold Nutrition,Vitamins,2106.9,"Niacin (as Nicotinic Acid), L-Arginine HCl, L-Citrulline, Acetyl-L-Carnitine Arginate DiHydrochloride, Glycine Propionyl-L-Carnitine HCl, Modified Cellulose (Hypromellose Veggie Capsule), Magnesium Stearate, Calcium Silicate, and Silicon Dioxide (Silica).",no,USA
+SKU-00103,"California Gold Nutrition, Rexdrive® Amino with L-Arginine HCl, L-Citrulline, Acetyl-L-Carnitine Arginate DiHydrochloride, and Glycine Propionyl-L-Carnitine HCl, Men's Formula, 60 Veggie Capsules",California Gold Nutrition,Vitamins,2106.9,"Niacin (as Nicotinic Acid), L-Arginine HCl, L-Citrulline, Acetyl-L-Carnitine Arginate DiHydrochloride, Glycine Propionyl-L-Carnitine HCl, Modified Cellulose (Hypromellose Veggie Capsule), Magnesium Stearate, Calcium Silicate, and Silicon Dioxide (Silica).",no,USA
+SKU-00104,Doctor's Best 5-HTP 100mg from Griffonia,Doctor's Best,Herbal,2106.9,"5-Hydroxytryptophan (5-HTP) 100mg (from Griffonia simplicifolia seed extract 200mg). Other Ingredients: Modified Cellulose (vegetable capsule), Microcrystalline Cellulose, Magnesium Stearate (vegetable source).",no,USA

@@ -1,14 +1,9 @@
 import json
-import os
 from datetime import date
 
-import anthropic
 import pandas as pd
-from dotenv import load_dotenv
 
 from engine.rules import COUNTRIES
-
-load_dotenv()
 
 TOOLS = [
     {
@@ -165,22 +160,49 @@ def _run_tool(name: str, inputs: dict, df: pd.DataFrame) -> str:
     return json.dumps({"error": f"Unknown tool: {name}"})
 
 
-def chat(messages: list, df: pd.DataFrame) -> tuple[str, list, dict]:
-    """One turn of the agentic chat loop. Returns (reply_text, updated_messages, usage)."""
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        return "ANTHROPIC_API_KEY not set in .env", messages, {}
+# System prompt formatted for prompt caching — must be identical across warm-up
+# and real calls so Anthropic's cache key matches.
+_CACHED_SYSTEM = [{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}]
 
-    client = anthropic.Anthropic(api_key=api_key)
 
+def warm_cache(client) -> None:
+    """
+    Fire a minimal API call in a background thread to load the system prompt
+    into Anthropic's prompt cache. Call this when the user enters the app so
+    the cache is warm before they reach Compliance Chat.
+    """
+    import threading
+
+    def _call():
+        try:
+            client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=1,
+                system=_CACHED_SYSTEM,
+                tools=TOOLS,
+                messages=[{"role": "user", "content": "Ready."}],
+            )
+        except Exception:
+            pass  # warm-up failure is silent — real calls still work uncached
+
+    threading.Thread(target=_call, daemon=True).start()
+
+
+def chat(messages: list, df: pd.DataFrame, client) -> tuple[str, list, dict]:
+    """
+    One turn of the agentic chat loop.
+    Returns (reply_text, updated_messages, usage) where usage is the aggregate
+    across all tool-call rounds — used by the caller for per-message UI captions.
+    Logging to Azure is handled automatically by the TrackedClient.
+    """
     working_messages = list(messages)
     usage = {"input_tokens": 0, "output_tokens": 0, "api_calls": 0}
 
-    for _ in range(8):  # max tool-call rounds
+    for _ in range(3):  # max tool-call rounds
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1024,
-            system=SYSTEM,
+            system=_CACHED_SYSTEM,
             tools=TOOLS,
             messages=working_messages,
         )

@@ -23,53 +23,25 @@ load_dotenv()
 if "nav_page" not in st.session_state:
     st.session_state["nav_page"] = "Introduction"
 
-# ── Centralised token logger ───────────────────────────────────────────────────
-_MODEL_PRICING = {
-    "claude-sonnet-4-6":        {"in": 3.00,  "out": 15.0},
-    "claude-haiku-4-5-20251001": {"in": 0.80,  "out":  4.0},
-}
-_TOKEN_LOG_PATH = Path(__file__).parent / "data" / "token_log.json"
+# ── Token logger (Azure Blob + Parquet) ───────────────────────────────────────
+from engine.token_logger import TokenLogger
+from engine.llm_client import TrackedClient
 
-def _load_token_log() -> list:
-    if _TOKEN_LOG_PATH.exists():
-        try:
-            import json as _j
-            return _j.loads(_TOKEN_LOG_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            return []
-    return []
+_token_logger = TokenLogger(project_id="iherb-gcc")
 
-def _save_token_log(log: list):
-    import json as _j
-    _TOKEN_LOG_PATH.write_text(_j.dumps(log, indent=2), encoding="utf-8")
-
-# Assign a stable session ID and load the persistent log once per session
 if "session_id" not in st.session_state:
     import uuid as _uuid
     st.session_state.session_id = _uuid.uuid4().hex[:8]
-if "token_log" not in st.session_state:
-    st.session_state.token_log = _load_token_log()
+if "session_calls" not in st.session_state:
+    st.session_state.session_calls = []  # current session only, for instant display
 
-def _log_tokens(page: str, model: str, usage: dict):
-    if not usage:
-        return
-    from datetime import datetime as _dt
-    pricing = _MODEL_PRICING.get(model, {"in": 3.0, "out": 15.0})
-    cost = (usage.get("input_tokens", 0) * pricing["in"]
-            + usage.get("output_tokens", 0) * pricing["out"]) / 1_000_000
-    entry = {
-        "session_id": st.session_state.session_id,
-        "date":       _dt.now().strftime("%Y-%m-%d"),
-        "time":       _dt.now().strftime("%H:%M:%S"),
-        "page":       page,
-        "model":      model,
-        "in_tokens":  usage.get("input_tokens", 0),
-        "out_tokens": usage.get("output_tokens", 0),
-        "api_calls":  usage.get("api_calls", 1),
-        "cost":       cost,
-    }
-    st.session_state.token_log.append(entry)
-    _save_token_log(st.session_state.token_log)
+def _make_client(page: str) -> TrackedClient:
+    return TrackedClient(
+        project_id="iherb-gcc",
+        session_id=st.session_state.session_id,
+        page=page,
+        session_log=st.session_state.session_calls,
+    )
 
 
 def _notes(content: str, label: str = "Notes"):
@@ -80,7 +52,7 @@ def _notes(content: str, label: str = "Notes"):
 
 # Streamlit Cloud stores secrets in st.secrets — push them into env so all
 # modules (advisor, scraper) pick them up via os.getenv() unchanged.
-for _k in ("ANTHROPIC_API_KEY", "APIFY_TOKEN"):
+for _k in ("ANTHROPIC_API_KEY", "APIFY_TOKEN", "AZURE_STORAGE_CONNECTION_STRING"):
     if _k in st.secrets and not os.getenv(_k):
         os.environ[_k] = st.secrets[_k]
 
@@ -93,7 +65,9 @@ st.set_page_config(
 )
 
 
-DATA_PATH = Path(__file__).parent / "data" / "mock_inventory.csv"
+PRODUCTS_PATH = Path(__file__).parent / "data" / "products.csv"
+STOCK_PATH    = Path(__file__).parent / "data" / "stock.csv"
+SALES_PATH    = Path(__file__).parent / "data" / "sales_events.csv"
 
 STATUS_COLOR = {
     "CLEAR":      "#2ecc71",
@@ -115,7 +89,11 @@ STATUS_LABEL = {
 # ── Data loading (cached) ──────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
 def get_report() -> pd.DataFrame:
-    inv = load_inventory(str(DATA_PATH))
+    inv = load_inventory(
+        products_path=str(PRODUCTS_PATH),
+        stock_path=str(STOCK_PATH),
+        sales_path=str(SALES_PATH),
+    )
     compliance = run_compliance(inv)
     return build_report(compliance)
 
@@ -138,7 +116,7 @@ with st.sidebar:
 
     st.divider()
     st.caption(f"Data as of: {date.today().strftime('%d %b %Y')}")
-    st.caption("Source: Mock inventory · 100 SKUs")
+    st.caption(f"Source: Mock inventory · {len(get_report())} SKUs")
 
     if st.button("Refresh data"):
         st.cache_data.clear()
@@ -357,8 +335,7 @@ if page == "Introduction":
         "Done well, this is not a replacement for your people or your systems. "
         "It is a way of making both more effective.\n\n"
         "The projects below are practical demonstrations of these ideas, applied to "
-        "business problems in the GCC market. All were built using "
-        "[Claude Code](https://claude.ai/code)."
+        "business problems in the GCC market."
     )
 
     st.markdown('<hr class="lp-divider">', unsafe_allow_html=True)
@@ -389,6 +366,8 @@ if page == "Introduction":
     )
 
     if st.button("Open — GCC Compliance Engine →", type="primary", use_container_width=True):
+        from engine.advisor import warm_cache
+        warm_cache(_make_client("Cache Warm-up"))
         st.session_state["nav_page"] = "Dashboard"
         st.rerun()
 
@@ -472,7 +451,7 @@ elif page == "Dashboard":
     # ── Shippable SKUs by country (stacked bar) ───────────────────────────────
     with col_left:
         st.subheader("SKUs Shippable to Each Country — by Block Reason")
-        st.caption("Shows how many of the 100 SKUs can ship to each destination right now, and why others are blocked.")
+        st.caption(f"Shows how many of the {len(df)} SKUs can ship to each destination right now, and why others are blocked.")
 
         bar_rows = []
         for country in COUNTRIES:
@@ -712,7 +691,7 @@ elif page == "Compliance Chat":
         with st.chat_message("assistant"):
             with st.spinner("Checking inventory…"):
                 try:
-                    reply, updated, usage = chat(list(st.session_state.chat_messages), df)
+                    reply, updated, usage = chat(list(st.session_state.chat_messages), df, _make_client("Compliance Chat"))
                 except Exception as e:
                     st.error(f"Chat error: {e}")
                     st.stop()
@@ -725,7 +704,6 @@ elif page == "Compliance Chat":
                 )
                 for k in ("input_tokens", "output_tokens", "api_calls"):
                     st.session_state.chat_usage[k] += usage.get(k, 0)
-                _log_tokens("Compliance Chat", "claude-sonnet-4-6", usage)
         st.session_state.chat_messages = updated
         st.rerun()
 
@@ -759,6 +737,7 @@ elif page == "Compliance Chat":
                     reply, updated, usage = chat(
                         [m for m in st.session_state.chat_messages],
                         df,
+                        _make_client("Compliance Chat"),
                     )
                 except Exception as e:
                     st.error(f"Chat error: {e}")
@@ -772,7 +751,6 @@ elif page == "Compliance Chat":
                 )
                 for k in ("input_tokens", "output_tokens", "api_calls"):
                     st.session_state.chat_usage[k] += usage.get(k, 0)
-                _log_tokens("Compliance Chat", "claude-sonnet-4-6", usage)
 
         st.session_state.chat_messages = updated
 
@@ -1002,12 +980,12 @@ what to do with it is AI. Both are useful. They are not the same thing.
                 st.caption("Writes updated Halal status to the inventory CSV and refreshes all pages.")
 
             if save:
-                inv_csv = pd.read_csv(str(DATA_PATH))
+                prods = pd.read_csv(str(PRODUCTS_PATH))
                 for _, row in edited.iterrows():
-                    inv_csv.loc[
-                        inv_csv["sku_id"] == row["SKU"], "halal_certified"
+                    prods.loc[
+                        prods["product_id"] == row["SKU"], "halal_certified"
                     ] = "yes" if row["Halal Certified"] else "no"
-                inv_csv.to_csv(str(DATA_PATH), index=False)
+                prods.to_csv(str(PRODUCTS_PATH), index=False)
                 st.cache_data.clear()
                 st.success("Halal certification updated — compliance recalculated.")
                 st.rerun()
@@ -1081,7 +1059,7 @@ All of these approaches have trade-offs between cost and effectiveness.
             st.error("ANTHROPIC_API_KEY not set.")
         else:
             with st.spinner("Classifying…"):
-                result = analyse_ingredients(sel["ingredients"], sel["name"])
+                result = analyse_ingredients(sel["ingredients"], sel["name"], _make_client("Product Lookup"))
 
             if "error" in result:
                 st.error(result["error"])
@@ -1092,7 +1070,6 @@ All of these approaches have trade-offs between cost and effectiveness.
                 if usage:
                     for k in ("input_tokens", "output_tokens", "api_calls"):
                         st.session_state.classifier_usage[k] += usage.get(k, 0)
-                    _log_tokens("Product Lookup", "claude-haiku-4-5-20251001", usage)
 
     # Render persisted classification result
     if "last_classification" in st.session_state:
@@ -1241,32 +1218,40 @@ All of these approaches have trade-offs between cost and effectiveness.
                    "The Dashboard and Allocation Table will update automatically.")
 
     if add_clicked:
-        existing_inv = pd.read_csv(str(DATA_PATH))
-        nums     = existing_inv["sku_id"].str.extract(r"(\d+)")[0].dropna().astype(int)
+        prods = pd.read_csv(str(PRODUCTS_PATH))
+        nums     = prods["product_id"].str.extract(r"(\d+)")[0].dropna().astype(int)
         next_num = int(nums.max()) + 1 if not nums.empty else 1
-        new_sku  = f"SKU-{next_num:05d}"
+        new_product_id = f"SKU{next_num:03d}"
+        new_batch_id   = f"BATCH-{today.strftime('%Y%m')}-{next_num:03d}"
 
-        new_row = {
-            "sku_id":                new_sku,
-            "product_name":          sel["name"],
-            "brand":                 brand,
-            "category":              category,
-            "hs_code":               hs_code,
-            "ingredients":           p_ingr,
-            "batch_id":              f"BATCH-{today.strftime('%Y%m')}-{next_num:03d}",
-            "manufacture_date":      str(manufacture_date),
-            "expiry_date":           str(expiry_date),
-            "total_shelf_life_days": shelf_days,
-            "qty_on_hand":           qty,
-            "unit_cost_usd":         unit_cost,
-            "halal_certified":       halal,
-            "country_of_origin":     origin,
+        new_product = {
+            "product_id":        new_product_id,
+            "product_name":      sel["name"],
+            "brand":             brand,
+            "category":          category,
+            "hs_code":           hs_code,
+            "ingredients":       p_ingr,
+            "halal_certified":   halal,
+            "country_of_origin": origin,
         }
+        updated_prods = pd.concat([prods, pd.DataFrame([new_product])], ignore_index=True)
+        updated_prods.to_csv(str(PRODUCTS_PATH), index=False)
 
-        updated_inv = pd.concat([existing_inv, pd.DataFrame([new_row])], ignore_index=True)
-        updated_inv.to_csv(str(DATA_PATH), index=False)
+        stock_df = pd.read_csv(str(STOCK_PATH))
+        new_stock = {
+            "batch_id":             new_batch_id,
+            "product_id":           new_product_id,
+            "manufacture_date":     str(manufacture_date),
+            "expiry_date":          str(expiry_date),
+            "total_shelf_life_days": shelf_days,
+            "qty_initial":          qty,
+            "unit_cost_usd":        unit_cost,
+        }
+        updated_stock = pd.concat([stock_df, pd.DataFrame([new_stock])], ignore_index=True)
+        updated_stock.to_csv(str(STOCK_PATH), index=False)
+
         st.cache_data.clear()
-        st.success(f"Added **{new_sku}** — {sel['name']} to inventory.")
+        st.success(f"Added **{new_product_id}** — {sel['name']} to inventory.")
         st.caption("Navigate to the Dashboard or Allocation Table to see the updated data.")
 
 
@@ -1278,8 +1263,7 @@ elif page == "Token Usage":
     st.header("Token Usage")
     st.caption("Persistent log of every API call — this session and since inception.")
 
-    log = st.session_state.get("token_log", [])
-    sid = st.session_state.session_id
+    session_calls = st.session_state.get("session_calls", [])
 
     def _usage_metrics(df, label):
         st.subheader(label)
@@ -1287,7 +1271,7 @@ elif page == "Token Usage":
             st.info("No calls recorded.")
             return
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Cost",         f"${df['cost'].sum():.4f}")
+        m1.metric("Cost",         f"${df['cost_usd'].sum():.4f}")
         m2.metric("Input tokens", f"{int(df['in_tokens'].sum()):,}")
         m3.metric("Output tokens",f"{int(df['out_tokens'].sum()):,}")
         m4.metric("API calls",    f"{int(df['api_calls'].sum()):,}")
@@ -1298,10 +1282,10 @@ elif page == "Token Usage":
         by_page = (
             df.groupby("page")
             .agg(calls=("api_calls","sum"), in_tokens=("in_tokens","sum"),
-                 out_tokens=("out_tokens","sum"), cost=("cost","sum"))
-            .reset_index().sort_values("cost", ascending=False)
+                 out_tokens=("out_tokens","sum"), cost_usd=("cost_usd","sum"))
+            .reset_index().sort_values("cost_usd", ascending=False)
         )
-        by_page["cost"]       = by_page["cost"].map("${:.4f}".format)
+        by_page["cost_usd"]   = by_page["cost_usd"].map("${:.4f}".format)
         by_page["in_tokens"]  = by_page["in_tokens"].map("{:,}".format)
         by_page["out_tokens"] = by_page["out_tokens"].map("{:,}".format)
         by_page.columns = ["Page", "API Calls", "In Tokens", "Out Tokens", "Cost"]
@@ -1310,51 +1294,52 @@ elif page == "Token Usage":
     def _call_log_table(df):
         if df.empty:
             return
-        d = df[["date","time","page","model","in_tokens","out_tokens","api_calls","cost"]].copy()
-        d["cost"]       = d["cost"].map("${:.4f}".format)
+        d = df[["date","time","page","model","in_tokens","out_tokens","api_calls","cost_usd"]].copy()
+        d["cost_usd"]   = d["cost_usd"].map("${:.4f}".format)
         d["in_tokens"]  = d["in_tokens"].map("{:,}".format)
         d["out_tokens"] = d["out_tokens"].map("{:,}".format)
         d.columns = ["Date","Time","Page","Model","In","Out","Calls","Cost"]
         st.dataframe(d.set_index("Date"), use_container_width=True)
 
-    if not log:
-        st.info("No API calls recorded yet. Use the Compliance Chat or Product Lookup to generate some.")
-    else:
-        df_all     = pd.DataFrame(log)
-        df_session = df_all[df_all["session_id"] == sid]
-        df_prior   = df_all[df_all["session_id"] != sid]
+    tab_session, tab_all = st.tabs(["This Session", "Since Inception"])
 
-        tab_session, tab_all = st.tabs(["This Session", "Since Inception"])
+    with tab_session:
+        df_session = pd.DataFrame(session_calls)
+        _usage_metrics(df_session, "This Session")
+        if not df_session.empty:
+            st.divider()
+            st.markdown("**By page**")
+            _by_page_table(df_session)
+            st.divider()
+            st.markdown("**Call log**")
+            _call_log_table(df_session)
 
-        with tab_session:
-            _usage_metrics(df_session, "This Session")
-            if not df_session.empty:
-                st.divider()
-                st.markdown("**By page**")
-                _by_page_table(df_session)
-                st.divider()
-                st.markdown("**Call log**")
-                _call_log_table(df_session)
-
-        with tab_all:
-            _usage_metrics(df_all, "All Time")
-            if not df_all.empty:
-                st.divider()
-                st.markdown("**By page**")
-                _by_page_table(df_all)
-                st.divider()
-                st.markdown("**By session**")
-                by_sess = (
-                    df_all.groupby(["session_id","date"])
-                    .agg(calls=("api_calls","sum"), cost=("cost","sum"))
-                    .reset_index().sort_values("date", ascending=False)
-                )
-                by_sess["cost"] = by_sess["cost"].map("${:.4f}".format)
-                by_sess.columns = ["Session", "Date", "API Calls", "Cost"]
-                st.dataframe(by_sess.set_index("Session"), use_container_width=True)
-                st.divider()
-                st.markdown("**Full call log**")
-                _call_log_table(df_all)
+    with tab_all:
+        col_refresh, _ = st.columns([1, 5])
+        if col_refresh.button("Refresh", use_container_width=True):
+            st.cache_data.clear()
+        @st.cache_data(ttl=300, show_spinner="Loading usage history…")
+        def _load_all_usage():
+            return _token_logger.query_df()
+        df_all = _load_all_usage()
+        _usage_metrics(df_all, "All Time")
+        if not df_all.empty:
+            st.divider()
+            st.markdown("**By page**")
+            _by_page_table(df_all)
+            st.divider()
+            st.markdown("**By session**")
+            by_sess = (
+                df_all.groupby(["session_id","date"])
+                .agg(calls=("api_calls","sum"), cost_usd=("cost_usd","sum"))
+                .reset_index().sort_values("date", ascending=False)
+            )
+            by_sess["cost_usd"] = by_sess["cost_usd"].map("${:.4f}".format)
+            by_sess.columns = ["Session", "Date", "API Calls", "Cost"]
+            st.dataframe(by_sess.set_index("Session"), use_container_width=True)
+            st.divider()
+            st.markdown("**Full call log**")
+            _call_log_table(df_all)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

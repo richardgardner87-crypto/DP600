@@ -1,9 +1,4 @@
-import os
 import json
-import anthropic
-from dotenv import load_dotenv
-
-load_dotenv()
 
 SYSTEM_PROMPT = """You are a GCC customs compliance expert specialising in dietary supplements and food products.
 Your job is to analyse product ingredient lists and return structured compliance data for all six GCC countries.
@@ -41,13 +36,13 @@ Respond ONLY with valid JSON matching this exact schema (no markdown, no explana
 }"""
 
 
-def analyse_ingredients(ingredient_text: str, product_name: str = "") -> dict:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        return {"error": "ANTHROPIC_API_KEY not set in .env"}
-
-    client = anthropic.Anthropic(api_key=api_key)
-
+def analyse_ingredients(ingredient_text: str, product_name: str, client) -> dict:
+    """
+    Classify ingredients against GCC customs rules.
+    `client` must be a TrackedClient (or compatible object with a .messages.create() method).
+    Logging to Azure is handled automatically by the client.
+    Returns the parsed result dict; on error returns {"error": ...}.
+    """
     user_content = f"Product: {product_name}\nIngredients: {ingredient_text}" if product_name else f"Ingredients: {ingredient_text}"
 
     raw = ""
@@ -59,7 +54,6 @@ def analyse_ingredients(ingredient_text: str, product_name: str = "") -> dict:
             messages=[{"role": "user", "content": user_content}],
         )
         raw = response.content[0].text.strip()
-        # Strip markdown code fences if present
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[-1]
             raw = raw.rsplit("```", 1)[0].strip()
@@ -72,5 +66,5 @@ def analyse_ingredients(ingredient_text: str, product_name: str = "") -> dict:
         return result
     except json.JSONDecodeError as e:
         return {"error": f"JSON parse error: {e}", "raw": raw}
-    except anthropic.APIError as e:
+    except Exception as e:
         return {"error": f"API error: {e}"}
