@@ -49,6 +49,10 @@ def _make_client(page: str) -> TrackedClient:
         session_log=st.session_state.session_calls,
     )
 
+@st.cache_data(ttl=300, show_spinner="Loading usage history…")
+def _load_all_usage() -> "pd.DataFrame":
+    return _token_logger.query_df()
+
 
 def _notes(content: str, label: str = "Notes"):
     """Render a floating Notes popover button."""
@@ -1299,10 +1303,6 @@ elif page == "Token Usage":
         d["out_tokens"] = d["out_tokens"].map("{:,}".format)
         d.columns = ["Date","Time","Page","Model","In","Out","Calls","Cost"]
         st.dataframe(d.set_index("Date"), use_container_width=True)
-
-    @st.cache_data(ttl=300, show_spinner="Loading usage history…")
-    def _load_all_usage():
-        return _token_logger.query_df()
 
     tab_session, tab_all = st.tabs(["This Session", "Since Inception"])
 

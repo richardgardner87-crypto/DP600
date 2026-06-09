@@ -33,18 +33,22 @@ COLUMNS = [
 class TokenLogger:
     def __init__(self, project_id: str, connection_string: str | None = None):
         self.project_id = project_id
-        conn_str = connection_string or os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")
-        if not conn_str:
-            raise ValueError("AZURE_STORAGE_CONNECTION_STRING not set")
-        self._conn_str = conn_str
+        self._conn_str_override = connection_string  # explicit override; env is read lazily
         self._svc = None  # lazy — avoids import cost at module load
+
+    def _conn_str(self) -> str:
+        """Read connection string lazily so Streamlit Cloud secrets are available."""
+        conn = self._conn_str_override or os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")
+        if not conn:
+            raise ValueError("AZURE_STORAGE_CONNECTION_STRING not set")
+        return conn
 
     # ── internals ──────────────────────────────────────────────────────────────
 
     def _service(self):
         if self._svc is None:
             from azure.storage.blob import BlobServiceClient
-            self._svc = BlobServiceClient.from_connection_string(self._conn_str)
+            self._svc = BlobServiceClient.from_connection_string(self._conn_str())
         return self._svc
 
     def _blob_path(self) -> str:
@@ -114,7 +118,7 @@ class TokenLogger:
             import duckdb
             db = duckdb.connect()
             db.execute("INSTALL azure; LOAD azure;")
-            db.execute(f"SET azure_storage_connection_string='{self._conn_str}';")
+            db.execute(f"SET azure_storage_connection_string='{self._conn_str()}';")
             return db.sql(
                 f"SELECT * FROM 'azure://{_CONTAINER}/{self.project_id}/*.parquet'"
                 f" ORDER BY date, time"
