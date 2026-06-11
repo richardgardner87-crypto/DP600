@@ -21,7 +21,7 @@ load_dotenv()
 
 # Streamlit Cloud stores secrets in st.secrets — push them into env before
 # anything tries to read them via os.getenv() (including TokenLogger init).
-for _k in ("ANTHROPIC_API_KEY", "APIFY_TOKEN", "AZURE_STORAGE_CONNECTION_STRING"):
+for _k in ("ANTHROPIC_API_KEY", "APIFY_TOKEN", "AZURE_STORAGE_CONNECTION_STRING", "DATABASE_URL"):
     if _k in st.secrets and not os.getenv(_k):
         os.environ[_k] = st.secrets[_k]
 
@@ -92,11 +92,7 @@ STATUS_LABEL = {
 # ── Data loading (cached) ──────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
 def get_report() -> pd.DataFrame:
-    inv = load_inventory(
-        products_path=str(PRODUCTS_PATH),
-        stock_path=str(STOCK_PATH),
-        sales_path=str(SALES_PATH),
-    )
+    inv = load_inventory()
     compliance = run_compliance(inv)
     return build_report(compliance)
 
@@ -983,12 +979,12 @@ what to do with it is AI. Both are useful. They are not the same thing.
                 st.caption("Writes updated Halal status to the inventory CSV and refreshes all pages.")
 
             if save:
-                prods = pd.read_csv(str(PRODUCTS_PATH))
+                from engine.db import execute as _db_exec
                 for _, row in edited.iterrows():
-                    prods.loc[
-                        prods["product_id"] == row["SKU"], "halal_certified"
-                    ] = "yes" if row["Halal Certified"] else "no"
-                prods.to_csv(str(PRODUCTS_PATH), index=False)
+                    _db_exec(
+                        "UPDATE products SET halal_certified = %s WHERE product_id = %s",
+                        ("yes" if row["Halal Certified"] else "no", row["SKU"]),
+                    )
                 st.cache_data.clear()
                 st.success("Halal certification updated — compliance recalculated.")
                 st.rerun()
@@ -1221,38 +1217,22 @@ All of these approaches have trade-offs between cost and effectiveness.
                    "The Dashboard and Allocation Table will update automatically.")
 
     if add_clicked:
-        prods = pd.read_csv(str(PRODUCTS_PATH))
-        nums     = prods["product_id"].str.extract(r"(\d+)")[0].dropna().astype(int)
-        next_num = int(nums.max()) + 1 if not nums.empty else 1
+        from engine.db import execute as _db_exec, query_df as _db_qdf
+        max_row = _db_qdf("SELECT MAX(CAST(SUBSTRING(product_id FROM 4) AS INTEGER)) AS mx FROM products WHERE product_id ~ '^SKU'")
+        next_num       = int(max_row["mx"].iloc[0] or 0) + 1
         new_product_id = f"SKU{next_num:03d}"
         new_batch_id   = f"BATCH-{today.strftime('%Y%m')}-{next_num:03d}"
 
-        new_product = {
-            "product_id":        new_product_id,
-            "product_name":      sel["name"],
-            "brand":             brand,
-            "category":          category,
-            "hs_code":           hs_code,
-            "ingredients":       p_ingr,
-            "halal_certified":   halal,
-            "country_of_origin": origin,
-        }
-        updated_prods = pd.concat([prods, pd.DataFrame([new_product])], ignore_index=True)
-        updated_prods.to_csv(str(PRODUCTS_PATH), index=False)
-
-        stock_df = pd.read_csv(str(STOCK_PATH))
-        new_stock = {
-            "batch_id":             new_batch_id,
-            "product_id":           new_product_id,
-            "manufacture_date":     str(manufacture_date),
-            "expiry_date":          str(expiry_date),
-            "total_shelf_life_days": shelf_days,
-            "qty_initial":          qty,
-            "unit_cost_usd":        unit_cost,
-        }
-        updated_stock = pd.concat([stock_df, pd.DataFrame([new_stock])], ignore_index=True)
-        updated_stock.to_csv(str(STOCK_PATH), index=False)
-
+        _db_exec(
+            """INSERT INTO products (product_id, product_name, brand, category, hs_code, ingredients, halal_certified, country_of_origin)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+            (new_product_id, sel["name"], brand, category, hs_code, p_ingr, halal, origin),
+        )
+        _db_exec(
+            """INSERT INTO stock (batch_id, product_id, manufacture_date, expiry_date, total_shelf_life_days, qty_initial, unit_cost_usd)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+            (new_batch_id, new_product_id, str(manufacture_date), str(expiry_date), shelf_days, qty, unit_cost),
+        )
         st.cache_data.clear()
         st.success(f"Added **{new_product_id}** — {sel['name']} to inventory.")
         st.caption("Navigate to the Dashboard or Allocation Table to see the updated data.")
@@ -1297,7 +1277,8 @@ elif page == "Token Usage":
     def _call_log_table(df):
         if df.empty:
             return
-        d = df[["date","time","page","model","in_tokens","out_tokens","api_calls","cost_usd"]].copy()
+        cols = ["logged_date","logged_time","page","model","in_tokens","out_tokens","api_calls","cost_usd"]
+        d = df[[c for c in cols if c in df.columns]].copy()
         d["cost_usd"]   = d["cost_usd"].map("${:.4f}".format)
         d["in_tokens"]  = d["in_tokens"].map("{:,}".format)
         d["out_tokens"] = d["out_tokens"].map("{:,}".format)
@@ -1321,16 +1302,6 @@ elif page == "Token Usage":
         col_refresh, _ = st.columns([1, 5])
         if col_refresh.button("Refresh", use_container_width=True):
             st.cache_data.clear()
-        conn_str_present = bool(os.getenv("AZURE_STORAGE_CONNECTION_STRING"))
-        st.caption(f"Azure connection string present: {conn_str_present}")
-        try:
-            from azure.storage.blob import BlobServiceClient
-            _svc = BlobServiceClient.from_connection_string(os.getenv("AZURE_STORAGE_CONNECTION_STRING", ""))
-            _cc  = _svc.get_container_client("token-logs")
-            blobs = [b.name for b in _cc.list_blobs(name_starts_with="iherb-gcc/")]
-            st.caption(f"Blobs found: {blobs}")
-        except Exception as _e:
-            st.error(f"Azure error: {_e}")
         df_all = _load_all_usage()
         _usage_metrics(df_all, "All Time")
         if not df_all.empty:

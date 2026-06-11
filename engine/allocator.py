@@ -16,39 +16,35 @@ def _all_flagged(results: dict, ingredients: str) -> str:
     return ", ".join(sorted(flagged)) if flagged else "—"
 
 
-def load_inventory(
-    csv_path: str | None = None,
-    products_path: str | None = None,
-    stock_path: str | None = None,
-    sales_path: str | None = None,
-) -> pd.DataFrame:
-    if csv_path:
-        # Legacy single-file mode
-        df = pd.read_csv(csv_path)
-        df["expiry_date"] = pd.to_datetime(df["expiry_date"]).dt.date
-        df["manufacture_date"] = pd.to_datetime(df["manufacture_date"]).dt.date
-        return df
-
-    products = pd.read_csv(products_path)
-    stock = pd.read_csv(stock_path)
-
-    if sales_path:
-        from pathlib import Path as _Path
-        if _Path(sales_path).exists():
-            sales = pd.read_csv(sales_path)
-            sold = sales.groupby("batch_id")["qty_sold"].sum().rename("total_sold")
-            stock = stock.join(sold, on="batch_id")
-        else:
-            stock["total_sold"] = 0
-    else:
-        stock["total_sold"] = 0
-
-    stock["total_sold"] = stock["total_sold"].fillna(0).astype(int)
-    stock["qty_on_hand"] = stock["qty_initial"] - stock["total_sold"]
-
-    df = stock.merge(products, on="product_id")
-    df.rename(columns={"product_id": "sku_id"}, inplace=True)
-    df["expiry_date"] = pd.to_datetime(df["expiry_date"]).dt.date
+def load_inventory() -> pd.DataFrame:
+    from engine.db import query_df
+    df = query_df("""
+        SELECT
+            s.batch_id,
+            p.product_id          AS sku_id,
+            p.product_name,
+            p.brand,
+            p.category,
+            p.hs_code,
+            p.ingredients,
+            p.halal_certified,
+            p.country_of_origin,
+            s.manufacture_date,
+            s.expiry_date,
+            s.total_shelf_life_days,
+            s.qty_initial,
+            s.unit_cost_usd,
+            COALESCE(sold.total_sold, 0)                        AS total_sold,
+            s.qty_initial - COALESCE(sold.total_sold, 0)        AS qty_on_hand
+        FROM stock s
+        JOIN products p ON s.product_id = p.product_id
+        LEFT JOIN (
+            SELECT batch_id, SUM(qty_sold) AS total_sold
+            FROM sales_events
+            GROUP BY batch_id
+        ) sold ON s.batch_id = sold.batch_id
+    """)
+    df["expiry_date"]      = pd.to_datetime(df["expiry_date"]).dt.date
     df["manufacture_date"] = pd.to_datetime(df["manufacture_date"]).dt.date
     return df
 
