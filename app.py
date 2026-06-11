@@ -1311,9 +1311,9 @@ elif page == "Token Usage":
             st.divider()
             st.markdown("**By session**")
             by_sess = (
-                df_all.groupby(["session_id","date"])
+                df_all.groupby(["session_id","logged_date"])
                 .agg(calls=("api_calls","sum"), cost_usd=("cost_usd","sum"))
-                .reset_index().sort_values("date", ascending=False)
+                .reset_index().sort_values("logged_date", ascending=False)
             )
             by_sess["cost_usd"] = by_sess["cost_usd"].map("${:.4f}".format)
             by_sess.columns = ["Session", "Date", "API Calls", "Cost"]
