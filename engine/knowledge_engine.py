@@ -62,20 +62,43 @@ def _hash(content: str | bytes) -> str:
     return hashlib.sha256(content).hexdigest()[:16]
 
 
-def _fetch_page(url: str) -> str | None:
-    """Fetch a URL using Playwright (handles JS-rendered pages). Returns text or None."""
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (compatible; GCC-Compliance-Engine/1.0; "
+        "regulatory research bot; contact: compliance@riadyh.com)"
+    )
+}
+
+
+def _fetch_page(url: str, timeout: int = 20) -> str | None:
+    """
+    Fetch a URL and return its text content.
+    Uses httpx (pure Python, no binary deps). Falls back to Playwright
+    for JS-heavy pages if httpx returns an empty or error body.
+    """
+    try:
+        import httpx
+        resp = httpx.get(url, headers=_HEADERS, timeout=timeout,
+                         follow_redirects=True)
+        if resp.status_code == 200 and len(resp.text) > 200:
+            return resp.text
+    except Exception as exc:
+        warnings.warn(f"Knowledge Engine: httpx failed for {url} — {exc}")
+
+    # Playwright fallback for JS-rendered pages (requires browser installation)
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(url, wait_until="domcontentloaded", timeout=20000)
+            page = browser.new_page(extra_http_headers=_HEADERS)
+            page.goto(url, wait_until="domcontentloaded", timeout=timeout * 1000)
             content = page.content()
             browser.close()
-            return content
+            return content if len(content) > 200 else None
     except Exception as exc:
-        warnings.warn(f"Knowledge Engine: failed to fetch {url} — {exc}")
-        return None
+        warnings.warn(f"Knowledge Engine: Playwright fallback failed for {url} — {exc}")
+
+    return None
 
 
 def _stored_hash(url: str) -> str | None:
