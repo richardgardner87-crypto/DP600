@@ -59,8 +59,7 @@ class TrackedClient:
         session_id: str,
         page: str,
         session_log: list | None = None,
-        connection_string: str | None = None,
     ):
         raw = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
-        logger = TokenLogger(project_id, connection_string)
+        logger = TokenLogger(project_id)
         self.messages = _TrackedMessages(raw, logger, session_id, page, session_log)
