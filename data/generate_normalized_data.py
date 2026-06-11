@@ -15,7 +15,7 @@ import pandas as pd
 
 # Allow importing engine modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from engine.rules import COUNTRIES, check_compliance
+from engine.rules import COUNTRIES, check_compliance, load_compliance_rules
 
 random.seed(42)
 
@@ -42,7 +42,7 @@ def rand_date() -> date:
     return SALE_START + timedelta(days=random.randint(0, (SALE_END - SALE_START).days))
 
 
-def generate_sales(row: pd.Series, qty_to_sell: int) -> list[dict]:
+def generate_sales(row: pd.Series, qty_to_sell: int, rules) -> list[dict]:
     """Return sale event dicts for one batch, never exceeding qty_to_sell."""
     events = []
     remaining = qty_to_sell
@@ -59,6 +59,7 @@ def generate_sales(row: pd.Series, qty_to_sell: int) -> list[dict]:
             ingredients=str(row["ingredients"]),
             halal_certified=str(row["halal_certified"]),
             hs_code=str(row["hs_code"]),
+            rules=rules,
             as_of=sale_date,
         )
 
@@ -102,6 +103,7 @@ def main():
     print(f"products.csv  — {len(products)} rows")
 
     # ── stock.csv + sales_events.csv ───────────────────────────────────────────
+    rules = load_compliance_rules()
     stock_rows  = []
     all_events  = []
 
@@ -119,7 +121,7 @@ def main():
             "unit_cost_usd":        row["unit_cost_usd"],
         })
 
-        all_events.extend(generate_sales(row, qty_to_sell))
+        all_events.extend(generate_sales(row, qty_to_sell, rules))
 
     stock_df = pd.DataFrame(stock_rows)
     stock_df.to_csv(STOCK_CSV, index=False)

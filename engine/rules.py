@@ -1,12 +1,10 @@
 from datetime import date
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 COUNTRIES = ["Saudi Arabia", "UAE", "Kuwait", "Qatar", "Bahrain", "Oman"]
 
-# ── Shelf life thresholds ──────────────────────────────────────────────────────
-# Minimum remaining shelf life as a fraction of total shelf life at time of import.
-# These are the PERCENTAGE-based rules. Some countries also have ABSOLUTE minimums.
+# ── Shelf life constants (still used by migration script + SHELF_LIFE_CONFIDENCE display) ──
 SHELF_LIFE_THRESHOLDS = {
     "Saudi Arabia": 0.50,
     "UAE":          0.75,
@@ -16,13 +14,10 @@ SHELF_LIFE_THRESHOLDS = {
     "Oman":         0.50,
 }
 
-# Absolute minimum remaining days — applied IN ADDITION to the percentage threshold
-# (whichever is more restrictive wins). Qatar requires 12 months absolute for supplements.
 SHELF_LIFE_MIN_DAYS = {
     "Qatar": 365,
 }
 
-# Confidence metadata for each country's shelf life rule
 SHELF_LIFE_CONFIDENCE = {
     "Saudi Arabia": {
         "level": "LOW",
@@ -67,41 +62,68 @@ SHELF_LIFE_CONFIDENCE = {
     },
 }
 
-CONFIDENCE_ICON = {"HIGH": "✓", "MEDIUM": "~", "LOW": "?"}
+CONFIDENCE_ICON  = {"HIGH": "✓", "MEDIUM": "~", "LOW": "?"}
 CONFIDENCE_COLOR = {"HIGH": "#2ecc71", "MEDIUM": "#f39c12", "LOW": "#e74c3c"}
 
-# ── Banned ingredients ─────────────────────────────────────────────────────────
-BANNED_ALL = [
-    "ephedrine", "ephedra", "ephedra sinica", "pseudoephedrine", "ephedra alkaloids",
-    "dmaa", "1,3-dimethylamylamine", "dimethylamylamine",
-    "dhea", "dehydroepiandrosterone",
-    "androstenedione",
-    "kratom", "mitragyna speciosa",
-    "kava", "piper methysticum", "kava kava",
-    "yohimbine", "yohimbe",
-    "thc", "cannabis", "cbd", "cannabidiol", "hemp extract", "hemp-derived",
-    "khat", "catha edulis",
-    "sarms",
-]
 
-BANNED_COUNTRY = {
-    "Saudi Arabia": ["poppy seed", "papaver somniferum", "nutmeg extract", "alcohol", "ethanol"],
-    "UAE":          ["poppy seed", "papaver somniferum", "5-htp", "5-hydroxytryptophan",
-                     "citrus aurantium", "synephrine", "alcohol", "ethanol"],
-    "Kuwait":       ["poppy seed"],
-    "Qatar":        ["poppy seed"],
-    "Bahrain":      ["poppy seed"],
-    "Oman":         ["poppy seed", "ephedra"],
-}
+# ── Loaded rules dataclass ─────────────────────────────────────────────────────
 
-RX_RECLASSIFY = ["melatonin"]
+@dataclass
+class LoadedRules:
+    """
+    Ingredient rules loaded from iherb.ingredient_master + aliases.
+    Passed into check_compliance() so the DB is queried once per batch,
+    not once per product.
+    """
+    # alias → set of countries it is banned in ('ALL_GCC' means every GCC country)
+    banned: dict[str, set[str]]
+    # set of aliases whose canonical ingredient is Rx-only
+    rx: set[str]
+    # set of aliases whose canonical ingredient triggers a Halal certificate requirement
+    halal: set[str]
 
-HALAL_SENSITIVE_KEYWORDS = [
-    "gelatin", "collagen", "fish oil", "fish", "bovine", "porcine",
-    "glucosamine", "chondroitin", "bone broth", "whey", "casein",
-    "shellfish", "marine", "albumin",
-]
 
+def load_compliance_rules() -> LoadedRules:
+    """
+    Read ingredient_master + ingredient_aliases + ingredient_country_bans from
+    PostgreSQL and return a LoadedRules ready for check_compliance().
+    """
+    from engine.db import query_df
+
+    df = query_df("""
+        SELECT
+            ia.alias,
+            im.restriction,
+            COALESCE(
+                array_agg(icb.country) FILTER (WHERE icb.country IS NOT NULL),
+                ARRAY[]::text[]
+            ) AS countries
+        FROM iherb.ingredient_aliases ia
+        JOIN iherb.ingredient_master im ON ia.ingredient_id = im.ingredient_id
+        LEFT JOIN iherb.ingredient_country_bans icb ON im.ingredient_id = icb.ingredient_id
+        GROUP BY ia.alias, im.restriction
+    """)
+
+    banned: dict[str, set[str]] = {}
+    rx:     set[str] = set()
+    halal:  set[str] = set()
+
+    for _, row in df.iterrows():
+        alias       = row["alias"]
+        restriction = row["restriction"]
+        countries   = set(row["countries"]) if row["countries"] is not None else set()
+
+        if restriction == "BANNED":
+            banned[alias] = countries
+        elif restriction == "RX_ONLY":
+            rx.add(alias)
+        elif restriction == "HALAL_TRIGGER":
+            halal.add(alias)
+
+    return LoadedRules(banned=banned, rx=rx, halal=halal)
+
+
+# ── Compliance result ──────────────────────────────────────────────────────────
 
 @dataclass
 class ComplianceResult:
@@ -109,12 +131,12 @@ class ComplianceResult:
     status: str          # CLEAR | SHELF_LIFE | INGREDIENT | RX_ONLY | HALAL
     days_remaining: int
     remaining_pct: float
-    threshold_pct: float           # effective threshold used (accounts for absolute minimums)
-    days_until_breach: int         # -ve means already breached
+    threshold_pct: float
+    days_until_breach: int
     flagged_ingredients: list
     needs_halal_cert: bool
     is_rx: bool
-    confidence: str = "LOW"        # HIGH | MEDIUM | LOW
+    confidence: str = "LOW"
     confidence_note: str = ""
 
 
@@ -125,38 +147,49 @@ def check_compliance(
     ingredients: str,
     halal_certified: str,
     hs_code: str,
+    rules: LoadedRules,
     as_of: Optional[date] = None,
 ) -> dict[str, ComplianceResult]:
-    today = as_of or date.today()
-    ingredients_lower = ingredients.lower()
+    today              = as_of or date.today()
+    ingredients_lower  = ingredients.lower()
 
     days_remaining = (expiry_date - today).days
-    remaining_pct = days_remaining / total_shelf_life_days if total_shelf_life_days > 0 else 0
+    remaining_pct  = days_remaining / total_shelf_life_days if total_shelf_life_days > 0 else 0
 
-    flagged_all = [i for i in BANNED_ALL if i in ingredients_lower]
-    is_rx = any(r in ingredients_lower for r in RX_RECLASSIFY)
-    needs_halal = any(k in ingredients_lower for k in HALAL_SENSITIVE_KEYWORDS)
-    halal_ok = halal_certified.strip().lower() == "yes"
+    # Rx check
+    is_rx = any(alias in ingredients_lower for alias in rules.rx)
+
+    # Halal check
+    needs_halal = any(alias in ingredients_lower for alias in rules.halal)
+    halal_ok    = halal_certified.strip().lower() == "yes"
+
+    # Banned aliases present in this product
+    present_banned: dict[str, set[str]] = {
+        alias: countries
+        for alias, countries in rules.banned.items()
+        if alias in ingredients_lower
+    }
 
     results = {}
     for country in COUNTRIES:
         pct_threshold = SHELF_LIFE_THRESHOLDS[country]
-        abs_min_days = SHELF_LIFE_MIN_DAYS.get(country, 0)
+        abs_min_days  = SHELF_LIFE_MIN_DAYS.get(country, 0)
 
-        # Effective required days: whichever rule is more restrictive
-        required_days = max(pct_threshold * total_shelf_life_days, abs_min_days)
+        required_days     = max(pct_threshold * total_shelf_life_days, abs_min_days)
         effective_threshold = required_days / total_shelf_life_days if total_shelf_life_days > 0 else pct_threshold
-
         days_until_breach = int(days_remaining - required_days)
 
-        country_banned = [i for i in BANNED_COUNTRY.get(country, []) if i in ingredients_lower]
-        all_flagged = flagged_all + country_banned
+        # Flagged = banned everywhere OR specifically banned in this country
+        flagged = [
+            alias for alias, countries in present_banned.items()
+            if "ALL_GCC" in countries or country in countries
+        ]
 
         conf = SHELF_LIFE_CONFIDENCE[country]
 
         if is_rx:
             status = "RX_ONLY"
-        elif all_flagged:
+        elif flagged:
             status = "INGREDIENT"
         elif needs_halal and not halal_ok:
             status = "HALAL"
@@ -165,6 +198,9 @@ def check_compliance(
         else:
             status = "CLEAR"
 
+        # Include matching Rx aliases in flagged_ingredients so the display can show them
+        rx_flagged = [alias for alias in rules.rx if alias in ingredients_lower] if is_rx else []
+
         results[country] = ComplianceResult(
             country=country,
             status=status,
@@ -172,7 +208,7 @@ def check_compliance(
             remaining_pct=round(remaining_pct, 4),
             threshold_pct=round(effective_threshold, 4),
             days_until_breach=days_until_breach,
-            flagged_ingredients=all_flagged,
+            flagged_ingredients=flagged + rx_flagged,
             needs_halal_cert=needs_halal and not halal_ok,
             is_rx=is_rx,
             confidence=conf["level"],

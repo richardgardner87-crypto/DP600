@@ -1,5 +1,5 @@
 """
-One-time migration: create the full schema and load all CSV data into PostgreSQL.
+One-time migration: create the full schema and load all data into PostgreSQL.
 
 Run from the project root:
     python data/migrate_to_postgres.py
@@ -16,11 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from engine.db import execute, execute_batch
-from engine.rules import (
-    COUNTRIES, SHELF_LIFE_THRESHOLDS, SHELF_LIFE_MIN_DAYS,
-    SHELF_LIFE_CONFIDENCE, BANNED_ALL, BANNED_COUNTRY,
-    RX_RECLASSIFY, HALAL_SENSITIVE_KEYWORDS,
-)
+from engine.rules import COUNTRIES, SHELF_LIFE_THRESHOLDS, SHELF_LIFE_MIN_DAYS, SHELF_LIFE_CONFIDENCE
 
 DATA = Path(__file__).parent
 
@@ -43,23 +39,55 @@ CREATE TABLE IF NOT EXISTS iherb.products (
 );
 
 CREATE TABLE IF NOT EXISTS iherb.stock (
-    batch_id            TEXT PRIMARY KEY,
-    product_id          TEXT NOT NULL REFERENCES products(product_id),
-    manufacture_date    DATE NOT NULL,
-    expiry_date         DATE NOT NULL,
+    batch_id              TEXT PRIMARY KEY,
+    product_id            TEXT NOT NULL REFERENCES iherb.products(product_id),
+    manufacture_date      DATE NOT NULL,
+    expiry_date           DATE NOT NULL,
     total_shelf_life_days INTEGER NOT NULL,
-    qty_initial         INTEGER NOT NULL,
-    unit_cost_usd       NUMERIC(10, 2) NOT NULL
+    qty_initial           INTEGER NOT NULL,
+    unit_cost_usd         NUMERIC(10, 2) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS iherb.sales_events (
     event_id            TEXT PRIMARY KEY,
-    batch_id            TEXT NOT NULL REFERENCES stock(batch_id),
-    product_id          TEXT NOT NULL REFERENCES products(product_id),
+    batch_id            TEXT NOT NULL REFERENCES iherb.stock(batch_id),
+    product_id          TEXT NOT NULL REFERENCES iherb.products(product_id),
     sale_date           DATE NOT NULL,
     destination_country TEXT NOT NULL,
     qty_sold            INTEGER NOT NULL,
     unit_sale_price_usd NUMERIC(10, 2) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS iherb.shelf_life_rules (
+    country           TEXT PRIMARY KEY,
+    threshold_pct     NUMERIC(5, 4) NOT NULL,
+    min_days          INTEGER,
+    confidence_level  TEXT NOT NULL DEFAULT 'LOW',
+    threshold_display TEXT,
+    confidence_note   TEXT,
+    confidence_source TEXT
+);
+
+-- Canonical ingredient registry
+CREATE TABLE IF NOT EXISTS iherb.ingredient_master (
+    ingredient_id  SERIAL PRIMARY KEY,
+    canonical_name TEXT NOT NULL UNIQUE,
+    restriction    TEXT NOT NULL CHECK (restriction IN ('BANNED', 'RX_ONLY', 'HALAL_TRIGGER')),
+    notes          TEXT
+);
+
+-- All known names / aliases (lowercased substring match against ingredients field)
+CREATE TABLE IF NOT EXISTS iherb.ingredient_aliases (
+    alias         TEXT PRIMARY KEY,
+    ingredient_id INTEGER NOT NULL REFERENCES iherb.ingredient_master(ingredient_id) ON DELETE CASCADE
+);
+
+-- Countries where this ingredient is banned
+-- 'ALL_GCC' = banned in every GCC country
+CREATE TABLE IF NOT EXISTS iherb.ingredient_country_bans (
+    ingredient_id INTEGER NOT NULL REFERENCES iherb.ingredient_master(ingredient_id) ON DELETE CASCADE,
+    country       TEXT NOT NULL,
+    PRIMARY KEY (ingredient_id, country)
 );
 
 CREATE TABLE IF NOT EXISTS finops.token_usage (
@@ -78,34 +106,175 @@ CREATE TABLE IF NOT EXISTS finops.token_usage (
 );
 
 CREATE INDEX IF NOT EXISTS idx_token_usage_project ON finops.token_usage(project_id);
-
-CREATE TABLE IF NOT EXISTS iherb.shelf_life_rules (
-    country           TEXT PRIMARY KEY,
-    threshold_pct     NUMERIC(5, 4) NOT NULL,
-    min_days          INTEGER,
-    confidence_level  TEXT NOT NULL DEFAULT 'LOW',
-    threshold_display TEXT,
-    confidence_note   TEXT,
-    confidence_source TEXT
-);
-
-CREATE TABLE IF NOT EXISTS iherb.banned_ingredients (
-    id          SERIAL PRIMARY KEY,
-    ingredient  TEXT NOT NULL,
-    country     TEXT NOT NULL DEFAULT 'ALL_GCC'
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_banned_unique ON iherb.banned_ingredients(ingredient, country);
-
-CREATE TABLE IF NOT EXISTS iherb.rx_ingredients (
-    ingredient TEXT PRIMARY KEY
-);
-
-CREATE TABLE IF NOT EXISTS iherb.halal_keywords (
-    keyword TEXT PRIMARY KEY
-);
 """
 
+# ── Ingredient master data ──────────────────────────────────────────────────────
+# (canonical_name, restriction, notes, [aliases], [ban_countries])
+# ban_countries: ['ALL_GCC'] or a list of specific GCC country names
+# HALAL_TRIGGER and RX_ONLY entries leave ban_countries empty
+
+INGREDIENT_DATA = [
+    # ── Banned all GCC ────────────────────────────────────────────────────────
+    ("Ephedrine", "BANNED",
+     "Sympathomimetic stimulant; controlled in all GCC states",
+     ["ephedrine", "ephedra", "ephedra sinica", "pseudoephedrine", "ephedra alkaloids",
+      "ma huang", "sida cordifolia"],
+     ["ALL_GCC"]),
+
+    ("DMAA", "BANNED",
+     "Amphetamine-like stimulant; banned by WADA and GCC regulators",
+     ["dmaa", "1,3-dimethylamylamine", "dimethylamylamine", "geranamine",
+      "methylhexaneamine", "1,3-dmaa", "geranium oil extract"],
+     ["ALL_GCC"]),
+
+    ("DHEA", "BANNED",
+     "Anabolic hormone precursor",
+     ["dhea", "dehydroepiandrosterone", "prasterone"],
+     ["ALL_GCC"]),
+
+    ("Androstenedione", "BANNED",
+     "Anabolic steroid precursor",
+     ["androstenedione", "andro", "4-androstenedione"],
+     ["ALL_GCC"]),
+
+    ("Kratom", "BANNED",
+     "Opioid-like plant alkaloid",
+     ["kratom", "mitragyna speciosa", "mitragyna", "ketum", "kakuam", "maeng da"],
+     ["ALL_GCC"]),
+
+    ("Kava", "BANNED",
+     "Psychoactive plant from Pacific Islands",
+     ["kava", "piper methysticum", "kava kava", "awa", "yaqona", "sakau"],
+     ["ALL_GCC"]),
+
+    ("Yohimbine", "BANNED",
+     "Alpha-2 adrenergic blocker; cardiovascular risk",
+     ["yohimbine", "yohimbe", "pausinystalia yohimbe", "corynanthe yohimbe",
+      "yohimbine hcl", "yohimbine hydrochloride", "alpha-yohimbine", "rauwolscine"],
+     ["ALL_GCC"]),
+
+    ("Cannabis/CBD/THC", "BANNED",
+     "Controlled substance; all forms including hemp derivatives",
+     ["thc", "cannabis", "cbd", "cannabidiol", "hemp extract", "hemp-derived",
+      "delta-8", "delta-9", "delta-8-thc", "delta-9-thc",
+      "full spectrum hemp", "broad spectrum hemp", "hemp oil",
+      "tetrahydrocannabinol", "endocannabinoid"],
+     ["ALL_GCC"]),
+
+    ("Khat", "BANNED",
+     "Controlled stimulant plant; cathinone is a scheduled substance",
+     ["khat", "catha edulis", "qat", "chat", "cathinone", "cathine"],
+     ["ALL_GCC"]),
+
+    ("SARMs", "BANNED",
+     "Selective androgen receptor modulators; unapproved drugs",
+     ["sarms", "selective androgen receptor modulator",
+      "ostarine", "mk-2866", "ligandrol", "lgd-4033",
+      "rad-140", "testolone", "andarine", "s4", "cardarine", "gw-501516"],
+     ["ALL_GCC"]),
+
+    ("Poppy Seed", "BANNED",
+     "Narcotic plant material; banned across all GCC states",
+     ["poppy seed", "papaver somniferum", "poppy seeds", "poppy extract"],
+     ["ALL_GCC"]),
+
+    # ── Banned specific countries ─────────────────────────────────────────────
+    ("Nutmeg Concentrate", "BANNED",
+     "Psychoactive at high doses via myristicin; banned in Saudi Arabia",
+     ["nutmeg extract", "nutmeg concentrate", "myristicin", "myristica fragrans extract"],
+     ["Saudi Arabia"]),
+
+    ("Alcohol", "BANNED",
+     "Prohibited in Saudi Arabia and UAE as a supplement ingredient",
+     ["alcohol", "ethanol", "ethyl alcohol", "isopropyl alcohol", "denatured alcohol"],
+     ["Saudi Arabia", "UAE"]),
+
+    ("5-HTP", "BANNED",
+     "Serotonin precursor; banned in UAE as it affects neurotransmitters",
+     ["5-htp", "5-hydroxytryptophan", "griffonia simplicifolia",
+      "griffonia extract", "griffonia seed extract", "l-5-hydroxytryptophan"],
+     ["UAE"]),
+
+    ("Synephrine", "BANNED",
+     "Stimulant from bitter orange; banned in UAE",
+     ["synephrine", "citrus aurantium", "bitter orange", "seville orange",
+      "p-synephrine", "citrus aurantium extract", "bitter orange extract",
+      "octopamine"],
+     ["UAE"]),
+
+    # ── Rx-only (all GCC) ─────────────────────────────────────────────────────
+    ("Melatonin", "RX_ONLY",
+     "Classified as a medicament (HS 3004) across GCC; requires prescription",
+     ["melatonin", "n-acetyl-5-methoxytryptamine", "melatonin extended release"],
+     []),
+
+    # ── Halal triggers ────────────────────────────────────────────────────────
+    ("Gelatin", "HALAL_TRIGGER",
+     "May be porcine or bovine; source must be certified halal",
+     ["gelatin", "gelatine", "hydrolysed gelatin", "collagen gelatin"],
+     []),
+
+    ("Collagen", "HALAL_TRIGGER",
+     "Usually animal-derived (bovine, marine, porcine)",
+     ["collagen", "bone broth", "collagen peptides", "hydrolysed collagen",
+      "bovine collagen", "marine collagen", "collagen hydrolysate"],
+     []),
+
+    ("Fish-Derived", "HALAL_TRIGGER",
+     "Requires halal certification confirming permissible fish species and processing",
+     ["fish oil", "fish", "marine", "anchovy", "sardine", "salmon",
+      "cod liver", "omega-3 fish", "fish gelatin", "fish collagen",
+      "fish peptides", "tuna"],
+     []),
+
+    ("Bovine", "HALAL_TRIGGER",
+     "Beef/cattle-derived ingredients require slaughter certification",
+     ["bovine", "beef", "cattle", "bovine hide", "bovine cartilage"],
+     []),
+
+    ("Porcine", "HALAL_TRIGGER",
+     "Pork-derived ingredients are haram",
+     ["porcine", "pork", "pig", "swine", "lard", "porcine gelatin"],
+     []),
+
+    ("Glucosamine", "HALAL_TRIGGER",
+     "Usually derived from shellfish; requires halal certification",
+     ["glucosamine", "glucosamine sulfate", "glucosamine hydrochloride",
+      "glucosamine hcl"],
+     []),
+
+    ("Chondroitin", "HALAL_TRIGGER",
+     "Usually derived from animal cartilage (bovine, porcine, or shark)",
+     ["chondroitin", "chondroitin sulfate", "chondroitin sulphate"],
+     []),
+
+    ("Whey", "HALAL_TRIGGER",
+     "Dairy-derived; requires halal-certified dairy processing",
+     ["whey", "whey protein", "whey isolate", "whey concentrate",
+      "whey peptides", "whey hydrolysate"],
+     []),
+
+    ("Casein", "HALAL_TRIGGER",
+     "Dairy-derived protein; requires halal certification",
+     ["casein", "micellar casein", "casein protein", "sodium caseinate",
+      "calcium caseinate"],
+     []),
+
+    ("Shellfish", "HALAL_TRIGGER",
+     "Halal status disputed for crustaceans in some GCC madhabs",
+     ["shellfish", "crustacean", "shrimp", "crab", "lobster",
+      "prawn", "oyster", "crab extract"],
+     []),
+
+    ("Albumin", "HALAL_TRIGGER",
+     "Blood or egg-derived; blood albumin is haram",
+     ["albumin", "egg albumin", "blood albumin", "serum albumin",
+      "bovine serum albumin"],
+     []),
+]
+
+
+# ── Load functions ──────────────────────────────────────────────────────────────
 
 def create_schema():
     execute(SCHEMA)
@@ -152,12 +321,11 @@ def load_sales():
     print(f"Sales events loaded: {len(rows)}")
 
 
-def load_customs_rules():
-    # Shelf life rules
-    shelf_rows = []
+def load_shelf_life_rules():
+    rows = []
     for country in COUNTRIES:
         conf = SHELF_LIFE_CONFIDENCE[country]
-        shelf_rows.append((
+        rows.append((
             country,
             SHELF_LIFE_THRESHOLDS[country],
             SHELF_LIFE_MIN_DAYS.get(country),
@@ -174,40 +342,48 @@ def load_customs_rules():
            ON CONFLICT (country) DO UPDATE SET
                threshold_pct = EXCLUDED.threshold_pct,
                min_days = EXCLUDED.min_days,
-               confidence_level = EXCLUDED.confidence_level,
-               threshold_display = EXCLUDED.threshold_display,
-               confidence_note = EXCLUDED.confidence_note,
-               confidence_source = EXCLUDED.confidence_source""",
-        shelf_rows,
+               confidence_level = EXCLUDED.confidence_level""",
+        rows,
     )
-    print(f"Shelf life rules loaded: {len(shelf_rows)}")
+    print(f"Shelf life rules loaded: {len(rows)}")
 
-    # Banned ingredients
-    banned_rows = [(i, "ALL_GCC") for i in BANNED_ALL]
-    for country, ingredients in BANNED_COUNTRY.items():
-        banned_rows.extend((i, country) for i in ingredients)
-    execute("TRUNCATE iherb.banned_ingredients")
-    execute_batch(
-        "INSERT INTO iherb.banned_ingredients (ingredient, country) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-        banned_rows,
-    )
-    print(f"Banned ingredients loaded: {len(banned_rows)}")
 
-    # Rx ingredients
-    execute("TRUNCATE iherb.rx_ingredients")
-    execute_batch(
-        "INSERT INTO iherb.rx_ingredients (ingredient) VALUES (%s) ON CONFLICT DO NOTHING",
-        [(i,) for i in RX_RECLASSIFY],
-    )
-    print(f"Rx ingredients loaded: {len(RX_RECLASSIFY)}")
+def load_ingredient_master():
+    execute("TRUNCATE iherb.ingredient_master CASCADE")
 
-    # Halal keywords
-    execute("TRUNCATE iherb.halal_keywords")
-    execute_batch(
-        "INSERT INTO iherb.halal_keywords (keyword) VALUES (%s) ON CONFLICT DO NOTHING",
-        [(k,) for k in HALAL_SENSITIVE_KEYWORDS],
-    )
-    print(f"Halal keywords loaded: {len(HALAL_SENSITIVE_KEYWORDS)}")
+    for canonical_name, restriction, notes, aliases, ban_countries in INGREDIENT_DATA:
+        # Insert master row
+        execute(
+            """INSERT INTO iherb.ingredient_master (canonical_name, restriction, notes)
+               VALUES (%s, %s, %s)""",
+            (canonical_name, restriction, notes),
+        )
+        # Get the generated ID
+        from engine.db import query_df
+        row = query_df(
+            "SELECT ingredient_id FROM iherb.ingredient_master WHERE canonical_name = %s",
+            (canonical_name,),
+        )
+        ingredient_id = int(row["ingredient_id"].iloc[0])
+
+        # Insert aliases
+        if aliases:
+            execute_batch(
+                """INSERT INTO iherb.ingredient_aliases (alias, ingredient_id)
+                   VALUES (%s, %s) ON CONFLICT (alias) DO NOTHING""",
+                [(a, ingredient_id) for a in aliases],
+            )
+
+        # Insert country bans
+        if ban_countries:
+            execute_batch(
+                """INSERT INTO iherb.ingredient_country_bans (ingredient_id, country)
+                   VALUES (%s, %s) ON CONFLICT DO NOTHING""",
+                [(ingredient_id, c) for c in ban_countries],
+            )
+
+    total_aliases = sum(len(a) for _, _, _, a, _ in INGREDIENT_DATA)
+    print(f"Ingredient master loaded: {len(INGREDIENT_DATA)} substances, {total_aliases} aliases")
 
 
 if __name__ == "__main__":
@@ -217,5 +393,6 @@ if __name__ == "__main__":
     load_products()
     load_stock()
     load_sales()
-    load_customs_rules()
+    load_shelf_life_rules()
+    load_ingredient_master()
     print("Migration complete.")

@@ -1,18 +1,13 @@
 from datetime import date, datetime
 import pandas as pd
-from engine.rules import check_compliance, COUNTRIES, worst_status, status_priority, RX_RECLASSIFY
+from engine.rules import check_compliance, load_compliance_rules, COUNTRIES, worst_status, status_priority
 
 
 def _all_flagged(results: dict, ingredients: str) -> str:
-    """Union of flagged ingredients across all countries, plus any Rx ingredients."""
+    """Union of flagged ingredients (banned + rx) across all countries."""
     flagged = set()
     for r in results.values():
         flagged.update(r.flagged_ingredients)
-    # RX_RECLASSIFY items never appear in flagged_ingredients — add them explicitly
-    ingr_lower = ingredients.lower()
-    for rx in RX_RECLASSIFY:
-        if rx in ingr_lower:
-            flagged.add(rx)
     return ", ".join(sorted(flagged)) if flagged else "—"
 
 
@@ -51,6 +46,7 @@ def load_inventory() -> pd.DataFrame:
 
 def run_compliance(df: pd.DataFrame, as_of: date | None = None) -> pd.DataFrame:
     today = as_of or date.today()
+    rules = load_compliance_rules()  # load once for the whole batch
     rows = []
 
     for _, row in df.iterrows():
@@ -61,6 +57,7 @@ def run_compliance(df: pd.DataFrame, as_of: date | None = None) -> pd.DataFrame:
             ingredients=str(row["ingredients"]),
             halal_certified=str(row["halal_certified"]),
             hs_code=str(row["hs_code"]),
+            rules=rules,
             as_of=today,
         )
 

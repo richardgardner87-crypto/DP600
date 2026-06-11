@@ -1161,6 +1161,7 @@ All of these approaches have trade-offs between cost and effectiveness.
     st.subheader("Compliance Preview")
 
     p_ingr = sel["ingredients"]
+    from engine.rules import load_compliance_rules as _load_rules
     compliance = check_compliance(
         expiry_date=expiry_date,
         manufacture_date=manufacture_date,
@@ -1168,6 +1169,7 @@ All of these approaches have trade-offs between cost and effectiveness.
         ingredients=p_ingr,
         halal_certified=halal,
         hs_code=hs_code,
+        rules=_load_rules(),
     )
 
     prev_cols = st.columns(6)
