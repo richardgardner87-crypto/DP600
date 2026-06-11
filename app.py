@@ -103,7 +103,7 @@ with st.sidebar:
     st.caption("Dietary Supplements — Allocation Risk Monitor")
     st.divider()
 
-    _pages = ["Introduction", "Process Flow", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage"]
+    _pages = ["Introduction", "Process Flow", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage", "Knowledge Engine"]
     _idx = _pages.index(st.session_state.get("nav_page", "Introduction"))
     page = st.radio(
         "Navigate",
@@ -1328,6 +1328,133 @@ elif page == "Token Usage":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE — ARCHITECTURE
 # ══════════════════════════════════════════════════════════════════════════════
+elif page == "Knowledge Engine":
+    from engine.knowledge_engine import run_check, accept_suggestion, dismiss_suggestion
+    components.html(_SCROLL_JS, height=0, scrolling=False)
+    st.header("Knowledge Engine")
+    st.caption("Farms GCC regulatory sources for ingredient rule changes and surfaces them for SME review.")
+
+    # ── Run check ─────────────────────────────────────────────────────────────
+    col_run, col_status = st.columns([1, 3])
+    with col_run:
+        run_btn = st.button("Run Check Now", type="primary", use_container_width=True)
+    with col_status:
+        st.caption(
+            "Fetches all active sources, detects content changes via hashing, "
+            "and uses Claude Opus to extract new rules. Only changed documents are sent to the LLM."
+        )
+
+    if run_btn:
+        with st.spinner("Checking sources — this may take a minute…"):
+            result = run_check(session_id=st.session_state.session_id)
+        st.success(
+            f"Check complete — {result['checked']} sources checked, "
+            f"{result['changed']} changed, "
+            f"{result['suggestions_created']} new suggestions created."
+        )
+        st.cache_data.clear()
+
+    st.divider()
+
+    # ── Sources ────────────────────────────────────────────────────────────────
+    with st.expander("Monitored Sources", expanded=False):
+        from engine.db import query_df as _ke_qdf
+        sources_df = _ke_qdf("SELECT source_name, country, index_url, check_freq, active, last_checked FROM iherb.source_watch ORDER BY source_id")
+        if not sources_df.empty:
+            sources_df["last_checked"] = pd.to_datetime(sources_df["last_checked"]).dt.strftime("%Y-%m-%d %H:%M").fillna("Never")
+            st.dataframe(sources_df.rename(columns={
+                "source_name": "Source", "country": "Country", "index_url": "URL",
+                "check_freq": "Frequency", "active": "Active", "last_checked": "Last Checked"
+            }), use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── SME Review ────────────────────────────────────────────────────────────
+    st.subheader("Pending Review")
+
+    from engine.db import query_df as _ke_qdf
+    pending = _ke_qdf(
+        "SELECT * FROM iherb.suggested_rules WHERE status = 'PENDING' ORDER BY created_at DESC"
+    )
+
+    if pending.empty:
+        st.info("No suggestions pending review.")
+    else:
+        st.caption(f"{len(pending)} suggestion{'s' if len(pending) != 1 else ''} awaiting review.")
+
+        for _, row in pending.iterrows():
+            sid = int(row["suggestion_id"])
+            change = row["proposed_change"] if isinstance(row["proposed_change"], dict) else {}
+            canonical = change.get("canonical_name", "Unknown substance")
+            restriction = change.get("restriction_type", "")
+            countries = ", ".join(change.get("countries", []))
+            confidence = change.get("confidence", "")
+
+            with st.expander(
+                f"#{sid} — **{canonical}** | {restriction} | {countries} | confidence: {confidence} | {row['source_name']}",
+                expanded=False,
+            ):
+                col_src, col_conf = st.columns([3, 1])
+                with col_src:
+                    st.markdown(f"**Source:** [{row['source_name']}]({row['source_url']})")
+                    st.markdown(f"**Countries:** {countries}")
+                with col_conf:
+                    st.markdown(f"**Restriction:** `{restriction}`")
+                    st.markdown(f"**Confidence:** `{confidence}`")
+
+                if change.get("aliases"):
+                    st.markdown(f"**Aliases found:** {', '.join(change['aliases'])}")
+
+                if change.get("notes"):
+                    st.info(change["notes"])
+
+                if row["extracted_text"]:
+                    with st.expander("Source text", expanded=False):
+                        st.text(row["extracted_text"])
+
+                col_acc, col_ign, col_mod = st.columns(3)
+                reviewer = "SME"
+
+                with col_acc:
+                    if st.button("Accept", key=f"acc_{sid}", type="primary", use_container_width=True):
+                        accept_suggestion(sid, accepted_by=reviewer)
+                        st.success(f"Suggestion #{sid} accepted — SCD2 record written.")
+                        st.rerun()
+
+                with col_ign:
+                    if st.button("Ignore", key=f"ign_{sid}", use_container_width=True):
+                        dismiss_suggestion(sid, reviewer, "IGNORED")
+                        st.rerun()
+
+                with col_mod:
+                    if st.button("Modify & Accept", key=f"mod_{sid}", use_container_width=True):
+                        st.session_state[f"mod_open_{sid}"] = True
+
+                if st.session_state.get(f"mod_open_{sid}"):
+                    mod_notes = st.text_area("Correction notes", key=f"modnotes_{sid}")
+                    if st.button("Save modification", key=f"modsave_{sid}", type="primary"):
+                        dismiss_suggestion(sid, reviewer, "MODIFIED", mod_notes)
+                        st.success("Saved as modified.")
+                        st.session_state.pop(f"mod_open_{sid}", None)
+                        st.rerun()
+
+    st.divider()
+
+    # ── Rule history (SCD2) ────────────────────────────────────────────────────
+    st.subheader("Rule History")
+    history = _ke_qdf("""
+        SELECT ir.rule_id, im.canonical_name, ir.country, ir.restriction_type,
+               ir.effective_date, ir.end_date, ir.supersession_notes, ir.accepted_by
+        FROM iherb.ingredient_rules ir
+        LEFT JOIN iherb.ingredient_master im ON ir.ingredient_id = im.ingredient_id
+        ORDER BY ir.effective_date DESC
+    """)
+    if history.empty:
+        st.info("No accepted rules yet — rule history will appear here after SME review.")
+    else:
+        st.dataframe(history, use_container_width=True, hide_index=True)
+
+
 elif page == "Process Flow":
     components.html(_SCROLL_JS, height=0, scrolling=False)
     st.header("Process Flow")
