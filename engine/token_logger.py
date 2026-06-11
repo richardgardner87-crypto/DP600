@@ -60,7 +60,7 @@ class TokenLogger:
 
         try:
             execute(
-                """INSERT INTO token_usage
+                """INSERT INTO finops.token_usage
                    (project_id, session_id, logged_date, logged_time, page, model,
                     in_tokens, out_tokens, api_calls, cost_usd)
                    VALUES (%(project_id)s, %(session_id)s, %(logged_date)s, %(logged_time)s,
@@ -78,7 +78,7 @@ class TokenLogger:
         """Return all usage rows for this project as a DataFrame."""
         try:
             return db_query_df(
-                "SELECT * FROM token_usage WHERE project_id = %s ORDER BY logged_date, logged_time",
+                "SELECT * FROM finops.token_usage WHERE project_id = %s ORDER BY logged_date, logged_time",
                 (self.project_id,),
             )
         except Exception:

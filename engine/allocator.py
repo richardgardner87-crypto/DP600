@@ -36,11 +36,11 @@ def load_inventory() -> pd.DataFrame:
             s.unit_cost_usd,
             COALESCE(sold.total_sold, 0)                        AS total_sold,
             s.qty_initial - COALESCE(sold.total_sold, 0)        AS qty_on_hand
-        FROM stock s
-        JOIN products p ON s.product_id = p.product_id
+        FROM iherb.stock s
+        JOIN iherb.products p ON s.product_id = p.product_id
         LEFT JOIN (
             SELECT batch_id, SUM(qty_sold) AS total_sold
-            FROM sales_events
+            FROM iherb.sales_events
             GROUP BY batch_id
         ) sold ON s.batch_id = sold.batch_id
     """)

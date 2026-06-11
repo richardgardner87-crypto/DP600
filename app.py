@@ -982,7 +982,7 @@ what to do with it is AI. Both are useful. They are not the same thing.
                 from engine.db import execute as _db_exec
                 for _, row in edited.iterrows():
                     _db_exec(
-                        "UPDATE products SET halal_certified = %s WHERE product_id = %s",
+                        "UPDATE iherb.products SET halal_certified = %s WHERE product_id = %s",
                         ("yes" if row["Halal Certified"] else "no", row["SKU"]),
                     )
                 st.cache_data.clear()
@@ -1218,18 +1218,18 @@ All of these approaches have trade-offs between cost and effectiveness.
 
     if add_clicked:
         from engine.db import execute as _db_exec, query_df as _db_qdf
-        max_row = _db_qdf("SELECT MAX(CAST(SUBSTRING(product_id FROM 4) AS INTEGER)) AS mx FROM products WHERE product_id ~ '^SKU'")
+        max_row = _db_qdf("SELECT MAX(CAST(SUBSTRING(product_id FROM 4) AS INTEGER)) AS mx FROM iherb.products WHERE product_id ~ '^SKU'")
         next_num       = int(max_row["mx"].iloc[0] or 0) + 1
         new_product_id = f"SKU{next_num:03d}"
         new_batch_id   = f"BATCH-{today.strftime('%Y%m')}-{next_num:03d}"
 
         _db_exec(
-            """INSERT INTO products (product_id, product_name, brand, category, hs_code, ingredients, halal_certified, country_of_origin)
+            """INSERT INTO iherb.products (product_id, product_name, brand, category, hs_code, ingredients, halal_certified, country_of_origin)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
             (new_product_id, sel["name"], brand, category, hs_code, p_ingr, halal, origin),
         )
         _db_exec(
-            """INSERT INTO stock (batch_id, product_id, manufacture_date, expiry_date, total_shelf_life_days, qty_initial, unit_cost_usd)
+            """INSERT INTO iherb.stock (batch_id, product_id, manufacture_date, expiry_date, total_shelf_life_days, qty_initial, unit_cost_usd)
                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
             (new_batch_id, new_product_id, str(manufacture_date), str(expiry_date), shelf_days, qty, unit_cost),
         )

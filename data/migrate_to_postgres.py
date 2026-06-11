@@ -28,7 +28,10 @@ DATA = Path(__file__).parent
 # ── Schema ─────────────────────────────────────────────────────────────────────
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS products (
+CREATE SCHEMA IF NOT EXISTS iherb;
+CREATE SCHEMA IF NOT EXISTS finops;
+
+CREATE TABLE IF NOT EXISTS iherb.products (
     product_id          TEXT PRIMARY KEY,
     product_name        TEXT NOT NULL,
     brand               TEXT,
@@ -39,7 +42,7 @@ CREATE TABLE IF NOT EXISTS products (
     country_of_origin   TEXT
 );
 
-CREATE TABLE IF NOT EXISTS stock (
+CREATE TABLE IF NOT EXISTS iherb.stock (
     batch_id            TEXT PRIMARY KEY,
     product_id          TEXT NOT NULL REFERENCES products(product_id),
     manufacture_date    DATE NOT NULL,
@@ -49,7 +52,7 @@ CREATE TABLE IF NOT EXISTS stock (
     unit_cost_usd       NUMERIC(10, 2) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS sales_events (
+CREATE TABLE IF NOT EXISTS iherb.sales_events (
     event_id            TEXT PRIMARY KEY,
     batch_id            TEXT NOT NULL REFERENCES stock(batch_id),
     product_id          TEXT NOT NULL REFERENCES products(product_id),
@@ -59,7 +62,7 @@ CREATE TABLE IF NOT EXISTS sales_events (
     unit_sale_price_usd NUMERIC(10, 2) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS token_usage (
+CREATE TABLE IF NOT EXISTS finops.token_usage (
     id          SERIAL PRIMARY KEY,
     project_id  TEXT NOT NULL,
     session_id  TEXT NOT NULL,
@@ -74,9 +77,9 @@ CREATE TABLE IF NOT EXISTS token_usage (
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_token_usage_project ON token_usage(project_id);
+CREATE INDEX IF NOT EXISTS idx_token_usage_project ON finops.token_usage(project_id);
 
-CREATE TABLE IF NOT EXISTS shelf_life_rules (
+CREATE TABLE IF NOT EXISTS iherb.shelf_life_rules (
     country           TEXT PRIMARY KEY,
     threshold_pct     NUMERIC(5, 4) NOT NULL,
     min_days          INTEGER,
@@ -86,19 +89,19 @@ CREATE TABLE IF NOT EXISTS shelf_life_rules (
     confidence_source TEXT
 );
 
-CREATE TABLE IF NOT EXISTS banned_ingredients (
+CREATE TABLE IF NOT EXISTS iherb.banned_ingredients (
     id          SERIAL PRIMARY KEY,
     ingredient  TEXT NOT NULL,
     country     TEXT NOT NULL DEFAULT 'ALL_GCC'
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_banned_unique ON banned_ingredients(ingredient, country);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_banned_unique ON iherb.banned_ingredients(ingredient, country);
 
-CREATE TABLE IF NOT EXISTS rx_ingredients (
+CREATE TABLE IF NOT EXISTS iherb.rx_ingredients (
     ingredient TEXT PRIMARY KEY
 );
 
-CREATE TABLE IF NOT EXISTS halal_keywords (
+CREATE TABLE IF NOT EXISTS iherb.halal_keywords (
     keyword TEXT PRIMARY KEY
 );
 """
@@ -112,9 +115,9 @@ def create_schema():
 def load_products():
     df = pd.read_csv(DATA / "products.csv")
     rows = [tuple(r) for r in df.itertuples(index=False, name=None)]
-    execute("TRUNCATE products CASCADE")
+    execute("TRUNCATE iherb.products CASCADE")
     execute_batch(
-        """INSERT INTO products
+        """INSERT INTO iherb.products
            (product_id, product_name, brand, category, hs_code, ingredients, halal_certified, country_of_origin)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
            ON CONFLICT (product_id) DO NOTHING""",
@@ -127,7 +130,7 @@ def load_stock():
     df = pd.read_csv(DATA / "stock.csv")
     rows = [tuple(r) for r in df.itertuples(index=False, name=None)]
     execute_batch(
-        """INSERT INTO stock
+        """INSERT INTO iherb.stock
            (batch_id, product_id, manufacture_date, expiry_date, total_shelf_life_days, qty_initial, unit_cost_usd)
            VALUES (%s, %s, %s, %s, %s, %s, %s)
            ON CONFLICT (batch_id) DO NOTHING""",
@@ -140,7 +143,7 @@ def load_sales():
     df = pd.read_csv(DATA / "sales_events.csv")
     rows = [tuple(r) for r in df.itertuples(index=False, name=None)]
     execute_batch(
-        """INSERT INTO sales_events
+        """INSERT INTO iherb.sales_events
            (event_id, batch_id, product_id, sale_date, destination_country, qty_sold, unit_sale_price_usd)
            VALUES (%s, %s, %s, %s, %s, %s, %s)
            ON CONFLICT (event_id) DO NOTHING""",
@@ -163,9 +166,9 @@ def load_customs_rules():
             conf["note"],
             conf["source"],
         ))
-    execute("TRUNCATE shelf_life_rules")
+    execute("TRUNCATE iherb.shelf_life_rules")
     execute_batch(
-        """INSERT INTO shelf_life_rules
+        """INSERT INTO iherb.shelf_life_rules
            (country, threshold_pct, min_days, confidence_level, threshold_display, confidence_note, confidence_source)
            VALUES (%s, %s, %s, %s, %s, %s, %s)
            ON CONFLICT (country) DO UPDATE SET
@@ -183,25 +186,25 @@ def load_customs_rules():
     banned_rows = [(i, "ALL_GCC") for i in BANNED_ALL]
     for country, ingredients in BANNED_COUNTRY.items():
         banned_rows.extend((i, country) for i in ingredients)
-    execute("TRUNCATE banned_ingredients")
+    execute("TRUNCATE iherb.banned_ingredients")
     execute_batch(
-        "INSERT INTO banned_ingredients (ingredient, country) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+        "INSERT INTO iherb.banned_ingredients (ingredient, country) VALUES (%s, %s) ON CONFLICT DO NOTHING",
         banned_rows,
     )
     print(f"Banned ingredients loaded: {len(banned_rows)}")
 
     # Rx ingredients
-    execute("TRUNCATE rx_ingredients")
+    execute("TRUNCATE iherb.rx_ingredients")
     execute_batch(
-        "INSERT INTO rx_ingredients (ingredient) VALUES (%s) ON CONFLICT DO NOTHING",
+        "INSERT INTO iherb.rx_ingredients (ingredient) VALUES (%s) ON CONFLICT DO NOTHING",
         [(i,) for i in RX_RECLASSIFY],
     )
     print(f"Rx ingredients loaded: {len(RX_RECLASSIFY)}")
 
     # Halal keywords
-    execute("TRUNCATE halal_keywords")
+    execute("TRUNCATE iherb.halal_keywords")
     execute_batch(
-        "INSERT INTO halal_keywords (keyword) VALUES (%s) ON CONFLICT DO NOTHING",
+        "INSERT INTO iherb.halal_keywords (keyword) VALUES (%s) ON CONFLICT DO NOTHING",
         [(k,) for k in HALAL_SENSITIVE_KEYWORDS],
     )
     print(f"Halal keywords loaded: {len(HALAL_SENSITIVE_KEYWORDS)}")
