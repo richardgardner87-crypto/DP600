@@ -915,7 +915,8 @@ what to do with it is AI. Both are useful. They are not the same thing.
 
     # ── Tab 4: Halal certification ────────────────────────────────────────────
     with tab4:
-        from engine.rules import HALAL_SENSITIVE_KEYWORDS
+        from engine.rules import load_compliance_rules as _load_rules
+        _halal_aliases = _load_rules().halal
 
         st.markdown(
             "Products whose ingredients include animal-derived substances "
@@ -926,7 +927,7 @@ what to do with it is AI. Both are useful. They are not the same thing.
 
         def _halal_match(ingr: str) -> str:
             il = str(ingr).lower()
-            return ", ".join(k for k in HALAL_SENSITIVE_KEYWORDS if k in il) or ""
+            return ", ".join(k for k in _halal_aliases if k in il) or ""
 
         halal_mask = df["ingredients"].apply(
             lambda i: bool(_halal_match(i))
