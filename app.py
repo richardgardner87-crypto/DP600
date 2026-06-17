@@ -103,7 +103,7 @@ with st.sidebar:
     st.caption("Dietary Supplements — Allocation Risk Monitor")
     st.divider()
 
-    _pages = ["Introduction", "Process Flow", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage", "Knowledge Engine", "Document Intelligence"]
+    _pages = ["Introduction", "Process Flow", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage", "Knowledge Engine"]
     _idx = _pages.index(st.session_state.get("nav_page", "Introduction"))
     page = st.radio(
         "Navigate",
@@ -371,21 +371,21 @@ if page == "Introduction":
         st.rerun()
 
     st.markdown(
-        '<div class="proj-card-soon">'
-        '<p class="proj-card-title">MIDP / Aconex Reconciliation'
-        '<span class="soon-badge">In Progress</span></p>'
-        "<p>AI assistance for a heavily manual process reconciling MIDP deliverables with "
-        "controlled documents in Aconex. Construction and engineering projects generate "
-        "thousands of controlled documents — cross-referencing deliverable registers against "
-        "submission records by hand is slow, error-prone, and a poor use of document "
-        "controllers' time.</p>"
-        "<p>This project explores the use case within a SharePoint environment, using "
-        "Microsoft's Graph API to leverage delta changes and optimise RAG — so the model "
-        "reasons over what has <em>changed</em> rather than re-ingesting the entire document "
-        "corpus on every query.</p>"
+        '<div class="proj-card">'
+        '<p class="proj-card-title">MIDP / Aconex Document Intelligence</p>'
+        "<p>Construction projects generate thousands of controlled documents. "
+        "Cross-referencing deliverable registers against submission records by hand is "
+        "slow, error-prone, and a poor use of document controllers' time.</p>"
+        "<p>This project demonstrates security-filtered document retrieval across a "
+        "construction project portfolio — showing how AI can answer questions about "
+        "project specifications while enforcing access boundaries between projects. "
+        "A project team member sees only their project; a programme manager sees all.</p>"
         "</div>",
         unsafe_allow_html=True,
     )
+    if st.button("Open — Document Intelligence →", type="primary", use_container_width=True):
+        st.session_state["nav_page"] = "Document Intelligence"
+        st.rerun()
 
     st.markdown(
         '<div class="proj-card-soon">'
@@ -1457,6 +1457,16 @@ elif page == "Knowledge Engine":
 
 elif page == "Document Intelligence":
     components.html(_SCROLL_JS, height=0, scrolling=False)
+    st.markdown(
+        """<style>
+        section[data-testid="stSidebar"] { display: none !important; }
+        button[data-testid="collapsedControl"] { display: none !important; }
+        </style>""",
+        unsafe_allow_html=True,
+    )
+    if st.button("← Back to Portfolio"):
+        st.session_state["nav_page"] = "Introduction"
+        st.rerun()
     st.header("Document Intelligence")
     st.caption("MIDP / Aconex — security-filtered document retrieval across construction project portfolios.")
 
