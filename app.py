@@ -104,14 +104,19 @@ with st.sidebar:
     st.divider()
 
     _pages = ["Introduction", "Process Flow", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage", "Knowledge Engine"]
-    _idx = _pages.index(st.session_state.get("nav_page", "Introduction"))
-    page = st.radio(
+    _nav = st.session_state.get("nav_page", "Introduction")
+    _idx = _pages.index(_nav) if _nav in _pages else 0
+    _radio = st.radio(
         "Navigate",
         _pages,
         index=_idx,
         label_visibility="collapsed",
     )
-    st.session_state["nav_page"] = page
+    # Only let the radio overwrite nav_page when on a sidebar page —
+    # off-sidebar pages (e.g. Document Intelligence) manage their own nav.
+    if _nav in _pages:
+        st.session_state["nav_page"] = _radio
+    page = st.session_state.get("nav_page", "Introduction")
 
     st.divider()
     st.caption(f"Data as of: {date.today().strftime('%d %b %Y')}")
