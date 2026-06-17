@@ -103,7 +103,7 @@ with st.sidebar:
     st.caption("Dietary Supplements — Allocation Risk Monitor")
     st.divider()
 
-    _pages = ["Introduction", "Process Flow", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage", "Knowledge Engine"]
+    _pages = ["Introduction", "Process Flow", "Dashboard", "Allocation Table", "Compliance Chat", "Risk Actions", "Product Lookup", "Token Usage", "Knowledge Engine", "Document Intelligence"]
     _idx = _pages.index(st.session_state.get("nav_page", "Introduction"))
     page = st.radio(
         "Navigate",
@@ -1453,6 +1453,173 @@ elif page == "Knowledge Engine":
         st.info("No accepted rules yet — rule history will appear here after SME review.")
     else:
         st.dataframe(history, use_container_width=True, hide_index=True)
+
+
+elif page == "Document Intelligence":
+    components.html(_SCROLL_JS, height=0, scrolling=False)
+    st.header("Document Intelligence")
+    st.caption("MIDP / Aconex — security-filtered document retrieval across construction project portfolios.")
+
+    st.info(
+        "This demo illustrates how AI document retrieval can be scoped by project access. "
+        "Try the same question as each persona to see how security context shapes the answer.",
+        icon="ℹ️",
+    )
+
+    # ── Persona selector ───────────────────────────────────────────────────────
+    PERSONAS = {
+        "AHF Project Team":   {"projects": ["AHF"], "label": "Al-Hamdulillah FC Stadium only"},
+        "RSG Project Team":   {"projects": ["RSG"], "label": "Red Sea Global Sports Complex only"},
+        "Programme Manager":  {"projects": ["AHF", "RSG"], "label": "All projects"},
+    }
+
+    if "di_persona" not in st.session_state:
+        st.session_state.di_persona = "AHF Project Team"
+    if "di_messages" not in st.session_state:
+        st.session_state.di_messages = []
+
+    st.markdown("**Viewing as:**")
+    cols = st.columns(3)
+    for i, (name, meta) in enumerate(PERSONAS.items()):
+        with cols[i]:
+            selected = st.session_state.di_persona == name
+            if st.button(
+                name,
+                key=f"persona_{i}",
+                type="primary" if selected else "secondary",
+                use_container_width=True,
+            ):
+                if not selected:
+                    st.session_state.di_persona = name
+                    st.session_state.di_messages = []
+                    st.rerun()
+
+    persona     = st.session_state.di_persona
+    allowed     = PERSONAS[persona]["projects"]
+    access_label = PERSONAS[persona]["label"]
+    st.caption(f"Access: {access_label}")
+
+    st.divider()
+
+    # ── Example questions ──────────────────────────────────────────────────────
+    if not st.session_state.di_messages:
+        st.markdown("**Try asking:**")
+        examples = [
+            "What are the environmental and climate considerations for the facade?",
+            "What cooling strategy is specified for hospitality areas?",
+            "What foundation system is recommended and why?",
+            "What are the energy performance targets?",
+            "What security provisions are required at the perimeter?",
+            "What glazing performance standards apply?",
+        ]
+        ex_cols = st.columns(2)
+        for i, q in enumerate(examples):
+            with ex_cols[i % 2]:
+                if st.button(q, key=f"di_ex_{i}", use_container_width=True):
+                    st.session_state.di_messages.append({"role": "user", "content": q})
+                    st.rerun()
+
+    # ── Render conversation ────────────────────────────────────────────────────
+    for msg in st.session_state.di_messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+            if msg["role"] == "assistant" and msg.get("sources"):
+                with st.expander("Sources consulted", expanded=False):
+                    for src in msg["sources"]:
+                        badge = "🟦" if src["project_id"] == "AHF" else "🟩"
+                        st.caption(
+                            f"{badge} **{src['title']}** "
+                            f"[{src['project_id']} · {src['discipline']}]  "
+                            f"`{src['doc_number']}`"
+                        )
+
+    # ── Answer pending user question ───────────────────────────────────────────
+    last = st.session_state.di_messages[-1] if st.session_state.di_messages else None
+    if last and last["role"] == "user":
+        question = last["content"]
+        with st.chat_message("assistant"):
+            with st.spinner("Searching documents…"):
+                from engine.db import query_df as _db_qdf
+                import anthropic as _ant
+
+                # Retrieve relevant chunks
+                chunks_df = _db_qdf(
+                    """
+                    SELECT doc_number, title, discipline, project_id, content,
+                           ts_rank(to_tsvector('english', content),
+                                   plainto_tsquery('english', %s)) AS rank
+                    FROM midp.document_chunks
+                    WHERE project_id = ANY(%s)
+                      AND to_tsvector('english', content)
+                          @@ plainto_tsquery('english', %s)
+                    ORDER BY rank DESC
+                    LIMIT 5
+                    """,
+                    (question, allowed, question),
+                )
+
+                if chunks_df.empty:
+                    answer = (
+                        "No relevant documents found in your accessible projects "
+                        f"({', '.join(allowed)}) for that question."
+                    )
+                    sources = []
+                else:
+                    sources = chunks_df.to_dict("records")
+                    context = "\n\n".join(
+                        f"[{c['project_id']} — {c['title']} ({c['discipline']})]\n{c['content']}"
+                        for c in sources
+                    )
+                    system_prompt = (
+                        f"You are a document intelligence assistant for a construction project portfolio. "
+                        f"The current user ({persona}) has access to: {', '.join(allowed)}. "
+                        f"Answer questions based only on the provided document excerpts. "
+                        f"Always cite which project and document each point comes from. "
+                        f"If the answer involves multiple projects, compare and contrast clearly. "
+                        f"Be concise and specific — this is a professional construction context."
+                    )
+                    _client = _ant.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+                    response = _client.messages.create(
+                        model="claude-sonnet-4-6",
+                        max_tokens=1024,
+                        system=system_prompt,
+                        messages=[{
+                            "role": "user",
+                            "content": f"Document excerpts:\n\n{context}\n\nQuestion: {question}",
+                        }],
+                    )
+                    answer = response.content[0].text
+                    _log_tokens("Document Intelligence", "claude-sonnet-4-6", {
+                        "input_tokens": response.usage.input_tokens,
+                        "output_tokens": response.usage.output_tokens,
+                    })
+
+            st.markdown(answer)
+            if sources:
+                with st.expander("Sources consulted", expanded=True):
+                    for src in sources:
+                        badge = "🟦" if src["project_id"] == "AHF" else "🟩"
+                        st.caption(
+                            f"{badge} **{src['title']}** "
+                            f"[{src['project_id']} · {src['discipline']}]  "
+                            f"`{src['doc_number']}`"
+                        )
+
+        st.session_state.di_messages.append({
+            "role": "assistant",
+            "content": answer,
+            "sources": sources if sources else [],
+        })
+
+    # ── Chat input ─────────────────────────────────────────────────────────────
+    if prompt := st.chat_input("Ask about the project documentation…"):
+        st.session_state.di_messages.append({"role": "user", "content": prompt})
+        st.rerun()
+
+    if st.session_state.di_messages:
+        if st.button("Clear conversation", type="secondary"):
+            st.session_state.di_messages = []
+            st.rerun()
 
 
 elif page == "Process Flow":
